@@ -185,8 +185,27 @@
   <section class="section contact" id="contact">
     <div class="container contact-inner">
       <h2>کارخانه‌ی شما آماده‌ی پایلوت است؟</h2>
-      <p class="section-lead">برای درخواست دمو یا همکاری پایلوت با تیم Granovo در ارتباط باشید.</p>
-      <a href="mailto:hello@granovo.ir" class="btn btn-primary btn-lg">ارسال ایمیل به تیم Granovo</a>
+      <p class="section-lead">اطلاعات کارخانه را بفرستید تا برای درخواست دمو یا همکاری پایلوت با شما تماس بگیریم.</p>
+      <form class="contact-form" id="contactForm">
+        <label>
+          نام و نام خانوادگی
+          <input type="text" name="name" autocomplete="name" required>
+        </label>
+        <label>
+          نام کارخانه
+          <input type="text" name="company" autocomplete="organization" required>
+        </label>
+        <label>
+          ایمیل کاری
+          <input type="email" name="email" autocomplete="email" required>
+        </label>
+        <label>
+          توضیح کوتاه درباره‌ی نیاز شما
+          <textarea name="message" rows="4" required></textarea>
+        </label>
+        <button type="submit" class="btn btn-primary btn-lg">ارسال درخواست دمو</button>
+        <p class="form-status" id="formStatus" role="status" aria-live="polite"></p>
+      </form>
     </div>
   </section>
 

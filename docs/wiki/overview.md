@@ -25,12 +25,12 @@ Optimization Platform).
 - [[concepts/roadmap-phases]] — ۵ فاز توسعه، هرکدام Milestone روی GitHub
 
 ## وضعیت فعلی پروژه
-مرحله‌ی idea/pre-code. تاکنون ساخته شده:
-- [[entities/landing-page]] — لندینگ‌پیج استاتیک معرفی محصول (`landing/`)
-- سند product brief و roadmap در `outputs/`
+مرحله‌ی foundation/validation. تاکنون ساخته شده:
+- [[entities/landing-page]] — لندینگ‌پیج استاتیک معرفی محصول (`landing/`) با فرم mailto
+- سند product brief، roadmap و پایه‌ی فنی/KPI در `outputs/`
 - ۲۰ issue + ۵ milestone روی ریپو GitHub (`massoudsh/Granovo`) مطابق فازهای رودمپ
 
-هیچ بک‌اند/مدل AI واقعی هنوز پیاده‌سازی نشده — فاز ۱ (اعتبارسنجی و پایه) در جریان است.
+هیچ بک‌اند، دیتابیس یا مدل AI واقعی هنوز پیاده‌سازی نشده — برای ساخت production باید ابتدا اعتبارسنجی کارخانه و داده‌ی پایلوت فراهم شود.
 
 > این ویکی طبق «Vault Recipe» نگه‌داری می‌شود (نگاه کنید `schema.md` و `CLAUDE.md` در ریشه‌ی
 > ریپو). هر تغییر معنایی در کد باید همین‌جا هم منعکس شود.

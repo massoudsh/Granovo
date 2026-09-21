@@ -6,17 +6,18 @@
 - معرفی برند Granovo و پیام اصلی («از آزمون‌وخطا تا تولید داده‌محور»)
 - نمایش مسئله (نرخ رد کالا ~۲۵٪) و هدف (زیر ۵٪)
 - معرفی چهار ستون AI (لینک به entityهای مربوطه در همین wiki)
-- CTA تماس (`mailto:hello@granovo.ir` — placeholder، باید با ایمیل واقعی جایگزین شود)
+- CTA تماس با فرم اطلاعات کارخانه که درخواست را در نرم‌افزار ایمیل کاربر آماده می‌کند (`mailto:hello@granovo.ir` — placeholder، باید با ایمیل واقعی جایگزین شود)
 
 ## وابستگی‌ها
 - محتوای این صفحه از [[overview]] و `outputs/granovo-product-brief.md` گرفته شده
 
 ## قراردادها / Edge cases
-- استاتیک محض (بدون backend/فرم واقعی) — فرم تماس فعلاً فقط mailto است.
+- استاتیک محض (بدون backend یا ذخیره‌سازی) — فرم تماس با اعتبارسنجی HTML، داده‌ها را به‌صورت mailto آماده می‌کند.
+- فرم تماس جایگزین ثبت‌نام یا جمع‌آوری داده‌ی production نیست و تا زمان اتصال backend نباید به‌عنوان CRM استفاده شود.
 - فونت Vazirmatn از Google Fonts CDN لود می‌شود؛ اگر نیاز به offline بود باید self-host شود.
 - راست‌چین (`dir="rtl"`, `lang="fa"`)، ریسپانسیو با CSS Grid/Flexbox خالص (بدون فریم‌ورک).
 
 ## منابع کد
 - `landing/index.html` — ساختار صفحه
 - `landing/assets/style.css` — تم بصری (گرادیان teal→blue مطابق برند Granovo)
-- `landing/assets/script.js` — منوی موبایل + سال فوتر
+- `landing/assets/script.js` — منوی موبایل، سال فوتر و آماده‌سازی mailto فرم تماس
