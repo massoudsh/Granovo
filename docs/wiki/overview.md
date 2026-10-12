@@ -27,7 +27,7 @@ Optimization Platform).
 ## وضعیت فعلی پروژه
 مرحله‌ی foundation/validation. تاکنون ساخته شده:
 - [[entities/landing-page]] — لندینگ‌پیج استاتیک معرفی محصول (`landing/`) با فرم mailto
-- سند product brief، roadmap و پایه‌ی فنی/KPI در `outputs/`
+- سند product brief، roadmap، پایه‌ی فنی/KPI و راهنمای برند در `outputs/`
 - ۲۰ issue + ۵ milestone روی ریپو GitHub (`massoudsh/Granovo`) مطابق فازهای رودمپ
 
 هیچ بک‌اند، دیتابیس یا مدل AI واقعی هنوز پیاده‌سازی نشده — برای ساخت production باید ابتدا اعتبارسنجی کارخانه و داده‌ی پایلوت فراهم شود.

@@ -9,6 +9,7 @@
 - CTA تماس با فرم اطلاعات کارخانه که درخواست را در نرم‌افزار ایمیل کاربر آماده می‌کند (`mailto:hello@granovo.ir` — placeholder، باید با ایمیل واقعی جایگزین شود)
 
 ## وابستگی‌ها
+- هویت بصری و رنگ‌های صفحه در `outputs/granovo-brand-guide.md` تعریف شده‌اند.
 - محتوای این صفحه از [[overview]] و `outputs/granovo-product-brief.md` گرفته شده
 
 ## قراردادها / Edge cases
