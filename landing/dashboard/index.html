@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="داشبورد اپراتور گرانوو برای ثبت تولید، بررسی نرخ رد کالا و پیشنهاد تنظیمات اکسترودر">
+  <title>Granovo | اتاق کنترل تولید</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="dashboard.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="/"><span class="logo-mark" aria-hidden="true"></span>Granovo</a>
+      <span class="workspace-label">اتاق کنترل تولید</span>
+      <button class="btn btn-ghost btn-sm" id="logout" hidden>خروج</button>
+    </div>
+  </header>
+  <main class="container workspace">
+    <div id="status" class="status" role="status" aria-live="polite">در حال بررسی نشست…</div>
+    <section id="auth" class="panel auth-panel" hidden aria-labelledby="auth-title">
+      <p class="section-eyebrow">پایه‌ی پایلوت صنعتی</p>
+      <h1 id="auth-title">ورود به فضای کارخانه</h1>
+      <p>داده‌های هر کارخانه مستقل است. برای شروع، حساب و دستگاه خود را ثبت کنید.</p>
+      <div class="auth-actions">
+        <button class="btn btn-primary" id="choose-login" type="button" aria-pressed="true">ورود</button>
+        <button class="btn btn-ghost" id="choose-register" type="button" aria-pressed="false">ثبت کارخانه جدید</button>
+      </div>
+      <form id="auth-form" class="fields">
+        <label id="factory-field" hidden>نام کارخانه<input name="factory_name" maxlength="120" autocomplete="organization"></label>
+        <label>ایمیل<input name="email" type="email" maxlength="254" autocomplete="username" dir="ltr" required></label>
+        <label>رمز عبور (۱۲ تا ۱۲۸ کاراکتر)<input name="password" type="password" minlength="12" maxlength="128" autocomplete="current-password" required></label>
+        <button class="btn btn-primary" type="submit">ادامه</button>
+      </form>
+    </section>
+
+    <div id="workspace" hidden>
+      <section class="workspace-intro">
+        <div><p class="section-eyebrow">از آزمون‌وخطا تا تولید داده‌محور</p><h1 id="factory-title">خط تولید شما</h1><p>ثبت هر بچ، یک قدم به تصمیم بهتر.</p></div>
+        <span class="phase-tag">نسخه‌ی آزمایشی پایلوت</span>
+      </section>
+      <nav class="workspace-nav" aria-label="بخش‌های داشبورد">
+        <a href="#metrics">عملکرد تولید</a><a href="#batch-panel">ثبت بچ</a><a href="#history-panel">تاریخچه</a><a href="#recommendation-panel">پیشنهاد تنظیمات</a><a href="#machine-panel">دستگاه‌ها</a>
+      </nav>
+      <section id="metrics" class="panel" aria-labelledby="metrics-title">
+        <div class="section-heading"><div><p class="section-eyebrow">معیار موفقیت</p><h2 id="metrics-title">نرخ رد کالا، با وزن واقعی تولید</h2></div><span class="target-tag">هدف پایلوت: کمتر از ۵٪</span></div>
+        <form id="filters" class="filter-grid">
+          <label>دستگاه<select id="filter-machine" name="machine_id"><option value="">همه‌ی دستگاه‌ها</option></select></label>
+          <label>از تاریخ (میلادی)<input name="start" type="date"></label>
+          <label>تا تاریخ (میلادی)<input name="end" type="date"></label>
+          <button class="btn btn-ghost" type="submit">اعمال فیلتر</button>
+        </form>
+        <div class="metrics-grid">
+          <article class="metric-card"><h3>خط مبنا</h3><strong id="baseline-rate">—</strong><p id="baseline-volume">هنوز داده‌ای ثبت نشده</p></article>
+          <article class="metric-card pilot"><h3>پایلوت</h3><strong id="pilot-rate">—</strong><p id="pilot-volume">هنوز داده‌ای ثبت نشده</p></article>
+          <article class="metric-card"><h3>کاهش نرخ رد</h3><strong id="rate-change">—</strong><p>واحد درصد نسبت به خط مبنا</p></article>
+        </div>
+        <p id="target-status" class="muted"></p>
+        <p class="disclaimer">نرخ رد = مجموع کیلوگرم مردود ÷ مجموع تولید × ۱۰۰. این گزارش به‌تنهایی اثبات موفقیت نیست؛ حداقل ۴ هفته خط مبنا، مواد قابل‌مقایسه و حفظ کیفیت باید بررسی شود.</p>
+      </section>
+
+      <div class="work-grid">
+        <section id="batch-panel" class="panel" aria-labelledby="batch-title">
+          <p class="section-eyebrow">داده‌ی واقعی، نه نمونه‌ی ساختگی</p><h2 id="batch-title">ثبت نتیجه‌ی بچ</h2>
+          <form id="batch-form" class="fields two-columns">
+            <label>دستگاه<select name="machine_id" class="machine-select" required></select></label>
+            <label>کد یکتای بچ<input name="code" maxlength="80" required></label>
+            <label>تاریخ تولید (میلادی)<input name="produced_on" type="date" required></label>
+            <label>مرحله<select name="phase"><option value="baseline">خط مبنا</option><option value="pilot">پایلوت</option></select></label>
+            <label>پلیمر اصلی<select name="polymer"><option>PP</option><option>PE</option><option>PET</option><option>PS</option><option>PVC</option><option>ABS</option></select></label>
+            <label>خلوص پلیمر اصلی (%)<input name="purity_pct" type="number" min="0" max="100" step="any" required></label>
+            <label>رطوبت (%)<input name="moisture_pct" type="number" min="0" max="100" step="any" required></label>
+            <label>دمای واقعی (°C)<input name="temperature_c" type="number" min="0" max="500" step="any" required></label>
+            <label>سرعت مارپیچ (rpm)<input name="screw_rpm" type="number" min="0.01" max="3000" step="any" required></label>
+            <label>فشار (bar)<input name="pressure_bar" type="number" min="0.01" max="2000" step="any" required></label>
+            <label>کل تولید (kg)<input name="total_kg" type="number" min="0.001" max="10000000" step="any" required></label>
+            <label>مقدار مردود (kg)<input name="rejected_kg" type="number" min="0" max="10000000" step="any" required></label>
+            <p class="disclaimer full-width">ترکیب فعلی با پلیمر اصلی، خلوص و رطوبت ثبت می‌شود؛ فرمول چندجزئی و اندازه‌گیری طیفی هنوز پیاده‌سازی نشده است. تأیید کیفیت پس از بررسی واقعی در تاریخچه انجام می‌شود.</p>
+            <button class="btn btn-primary" type="submit">ذخیره‌ی نتیجه</button>
+          </form>
+        </section>
+        <div class="side-stack">
+          <section id="machine-panel" class="panel" aria-labelledby="machine-title">
+            <h2 id="machine-title">تعریف اکسترودر</h2>
+            <p>محدوده‌ی مجاز را فقط از مشخصات تأییدشده‌ی دستگاه وارد کنید؛ این اعداد توصیه‌ی عملیاتی نیستند.</p>
+            <form id="machine-form" class="fields two-columns">
+              <label class="full-width">نام دستگاه<input name="name" maxlength="120" required></label>
+              <label>حداقل دما (°C)<input name="temperature_min" type="number" min="0" max="500" step="any" required></label>
+              <label>حداکثر دما (°C)<input name="temperature_max" type="number" min="0.01" max="500" step="any" required></label>
+              <label>حداکثر سرعت (rpm)<input name="rpm_max" type="number" min="0.01" max="3000" step="any" required></label>
+              <label>حداکثر فشار (bar)<input name="pressure_max" type="number" min="0.01" max="2000" step="any" required></label>
+              <button class="btn btn-ghost" type="submit">ثبت دستگاه</button>
+            </form>
+            <ul id="machine-list" class="machine-list"></ul>
+          </section>
+          <section class="panel" aria-labelledby="csv-title">
+            <h2 id="csv-title">ورود گروهی داده</h2>
+            <p>فایل UTF-8، حداکثر ۵۰۰ ردیف و یک مگابایت. اگر یک ردیف نامعتبر باشد، هیچ ردیفی ذخیره نمی‌شود.</p>
+            <button id="csv-template" class="text-button" type="button">دریافت قالب CSV</button>
+            <form id="csv-form" class="fields"><label>فایل CSV<input name="csv" type="file" accept=".csv,text/csv" required></label><button class="btn btn-ghost" type="submit">بررسی و ورود فایل</button></form>
+            <p class="disclaimer">شناسه‌ی دستگاه برای CSV در فهرست دستگاه‌ها نمایش داده می‌شود.</p>
+          </section>
+        </div>
+      </div>
+
+      <section id="history-panel" class="panel" aria-labelledby="history-title">
+        <div class="section-heading"><h2 id="history-title">تاریخچه‌ی تولید</h2><span id="history-count" class="muted"></span></div>
+        <p class="disclaimer">«تأیید کیفیت» یعنی نتیجه را در کارخانه بررسی کرده‌اید. فقط بچ‌های تأییدشده با نرخ رد کمتر از ۵٪ می‌توانند داده‌ی مدل آزمایشی باشند.</p>
+        <div class="table-scroll"><table><caption class="visually-hidden">بچ‌های تولید مطابق فیلتر عملکرد</caption><thead><tr><th scope="col">بچ / تاریخ</th><th scope="col">دستگاه / پلیمر</th><th scope="col">مرحله</th><th scope="col">تولید / مردود (kg)</th><th scope="col">نرخ رد</th><th scope="col">کیفیت</th></tr></thead><tbody id="batch-rows"></tbody></table></div>
+        <p id="history-empty" class="empty-state">هنوز بچی ثبت نشده است.</p>
+      </section>
+
+      <section id="recommendation-panel" class="panel" aria-labelledby="recommendation-title">
+        <p class="section-eyebrow">با تأیید اپراتور، بدون کنترل ماشین</p><h2 id="recommendation-title">پیشنهاد تنظیمات آزمایشی</h2>
+        <p class="disclaimer warning">این مدل ساده از نزدیک‌ترین نمونه‌های تاریخی استفاده می‌کند و مدل صنعتی اعتبارسنجی‌شده نیست. حداقل ۸ بچ تأییدکیفی‌شده با نرخ رد زیر ۵٪ برای همان دستگاه و پلیمر لازم است. خارج از دامنه‌ی داده‌ی ثبت‌شده پیشنهادی صادر نمی‌شود. اتصال به PLC یا اعمال خودکار وجود ندارد.</p>
+        <form id="recommendation-form" class="filter-grid">
+          <label>دستگاه<select class="machine-select" name="machine_id" required></select></label>
+          <label>پلیمر اصلی<select name="polymer"><option>PP</option><option>PE</option><option>PET</option><option>PS</option><option>PVC</option><option>ABS</option></select></label>
+          <label>خلوص (%)<input name="purity_pct" type="number" min="0" max="100" step="any" required></label>
+          <label>رطوبت (%)<input name="moisture_pct" type="number" min="0" max="100" step="any" required></label>
+          <button class="btn btn-primary" type="submit">محاسبه‌ی پیشنهاد</button>
+        </form>
+        <p id="model-evaluation" class="muted" role="status"></p>
+        <div id="recommendation-list" class="recommendation-grid"></div>
+        <p id="recommendation-empty" class="empty-state">پیشنهادی ثبت نشده است؛ ابتدا داده‌ی واقعی و تأییدشده جمع‌آوری کنید.</p>
+      </section>
+    </div>
+  </main>
+  <footer class="site-footer"><div class="container footer-inner"><span>Granovo — تصمیم‌های بهتر، با داده‌های واقعی</span><a href="/">معرفی محصول</a></div></footer>
+</body>
+</html>

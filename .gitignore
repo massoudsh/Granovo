@@ -40,5 +40,13 @@ npm-debug.log*
 .turbo/
 tsconfig.tsbuildinfo
 
+# Python tests and local development database
+.pytest_cache/
+.pytest-data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
 # OS
 Thumbs.db

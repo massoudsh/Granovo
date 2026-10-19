@@ -349,7 +349,7 @@ a { color: inherit; text-decoration: none; }
   .marketplace-inner { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1000px) {
   .nav { display: none; }
   .nav-toggle { display: flex; }
   .header-inner .btn-sm { display: none; }

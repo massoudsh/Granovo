@@ -13,7 +13,8 @@
 - [[entities/marketplace]] — بازارگاه B2B فروش گرانول بازیافتی
 - [[entities/landing-page]] — لندینگ‌پیج استاتیک معرفی محصول (`landing/`)
 
-## Concepts (۳ صفحه)
+## Concepts (۴ صفحه)
+- [[concepts/production-workflow]] — حساب کارخانه، دیتابیس، ثبت بچ/CSV، داشبورد اپراتور و KPI وزن‌دار
 - [[concepts/data-moat]] — مزیت رقابتی از داده‌ی بومی «ترکیب ← پارامتر ← کیفیت»
 - [[concepts/business-model]] — مدل درآمدی SaaS + کمیسیون بازارگاه
 - [[concepts/roadmap-phases]] — ۵ فاز توسعه و نگاشت به Milestone/Issueهای GitHub
