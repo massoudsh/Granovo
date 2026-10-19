@@ -27,7 +27,7 @@ GitHub issues #6/#8/#9 پیش رفته‌اند؛ آموزش صنعتی و پا�
 
 ## منابع کد
 - `backend/predictor.py:10` — مدل ۳همسایه، gate داده، نسخه و MAE
-- `backend/app.py:263` — انتخاب داده‌ی واجد شرایط؛ `backend/app.py:269` — ثبت پیشنهاد
-- `backend/app.py:287` — تأیید اپراتور و رد نسخه‌ی قدیمی
+- `backend/app.py:269` — انتخاب داده‌ی واجد شرایط؛ `backend/app.py:275` — ثبت پیشنهاد
+- `backend/app.py:293` — تأیید اپراتور و رد نسخه‌ی قدیمی
 - `backend/db.py:62` — ورودی/خروجی، ارزیابی و تأیید ذخیره‌شده
-- `landing/dashboard/dashboard.js:141` — نمایش پیشنهاد و تأیید در UI
+- `landing/dashboard/dashboard.js:144` — نمایش پیشنهاد و تأیید در UI

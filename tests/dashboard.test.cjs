@@ -56,12 +56,26 @@ test("expired session shows sign-in and clears private workspace", async () => {
 
 test("KPI cards distinguish no data from zero and negative reduction", async () => {
   const { nodes, run } = await dashboard();
-  run(`renderKpis({baseline:{reject_pct:0,count:1,total_kg:10},pilot:{reject_pct:null,count:0,total_kg:0},reduction_percentage_points:null,pilot_below_target:null})`);
+  run(`renderKpis({daily:[],baseline:{reject_pct:0,count:1,total_kg:10},pilot:{reject_pct:null,count:0,total_kg:0},reduction_percentage_points:null,pilot_below_target:null})`);
   assert.notEqual(nodes.get("baseline-rate").textContent, "بدون داده");
   assert.equal(nodes.get("pilot-rate").textContent, "بدون داده");
   assert.equal(nodes.get("rate-change").textContent, "—");
-  run(`renderKpis({baseline:{reject_pct:4,count:1,total_kg:10},pilot:{reject_pct:8,count:1,total_kg:10},reduction_percentage_points:-4,pilot_below_target:false})`);
+  run(`renderKpis({daily:[],baseline:{reject_pct:4,count:1,total_kg:10},pilot:{reject_pct:8,count:1,total_kg:10},reduction_percentage_points:-4,pilot_below_target:false})`);
   assert.match(nodes.get("target-status").textContent, /هنوز/);
+});
+
+test("daily quality trend renders weighted rates and handles empty ranges", async () => {
+  const { nodes, run } = await dashboard();
+  const summary = `baseline:{reject_pct:14,count:2,total_kg:1000},pilot:{reject_pct:null,count:0,total_kg:0},reduction_percentage_points:null,pilot_below_target:null`;
+  run(`renderKpis({${summary},daily:[{produced_on:"2025-01-01",phase:"baseline",count:2,total_kg:1000,rejected_kg:140,reject_pct:14}]})`);
+  assert.equal(nodes.get("daily-empty").hidden, true);
+  const cells = nodes.get("daily-rows").children[0].children;
+  assert.equal(cells[0].textContent, "2025-01-01");
+  assert.equal(cells[1].textContent, "خط مبنا");
+  assert.match(cells[5].textContent, /٪/);
+  run(`renderKpis({${summary},daily:[]})`);
+  assert.equal(nodes.get("daily-empty").hidden, false);
+  assert.equal(nodes.get("daily-rows").children.length, 0);
 });
 
 test("batch rendering treats factory-supplied text as text, not HTML", async () => {
@@ -105,7 +119,7 @@ test("API writes include CSRF token and encode data as JSON", async () => {
 test("registration loads the factory workspace and subsequent batch submission refreshes KPIs", async () => {
   const { context, nodes, run } = await dashboard();
   const requests = [];
-  const emptyKpis = { baseline: { reject_pct: null, count: 0, total_kg: 0 }, pilot: { reject_pct: null, count: 0, total_kg: 0 }, reduction_percentage_points: null, pilot_below_target: null };
+  const emptyKpis = { daily: [], baseline: { reject_pct: null, count: 0, total_kg: 0 }, pilot: { reject_pct: null, count: 0, total_kg: 0 }, reduction_percentage_points: null, pilot_below_target: null };
   context.fetch = async (url, options) => {
     requests.push({ url, ...options });
     let result;

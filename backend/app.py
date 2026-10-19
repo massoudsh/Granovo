@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from sqlalchemy import delete, func, insert, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from backend import db, schemas
 from backend.predictor import predict
@@ -257,6 +257,12 @@ def create_app(engine=None, secure_cookies=True):
         result["reduction_percentage_points"] = round(baseline - pilot, 3) if baseline is not None and pilot is not None else None
         result["pilot_below_target"] = raw_rates["pilot"] < 5 if "pilot" in raw_rates else None
         result["target_pct"] = 5
+        daily_rows = conn.execute(select(db.batches.c.produced_on, db.batches.c.phase,
+            func.count().label("count"), func.sum(db.batches.c.total_kg).label("total_kg"),
+            func.sum(db.batches.c.rejected_kg).label("rejected_kg"))
+            .where(*conditions).group_by(db.batches.c.produced_on, db.batches.c.phase)
+            .order_by(db.batches.c.produced_on, db.batches.c.phase)).mappings()
+        result["daily"] = [{**dict(row), "reject_pct": round(row["rejected_kg"] / row["total_kg"] * 100, 6)} for row in daily_rows]
         result["notice"] = "Mass-weighted descriptive metric only; confirm baseline duration, comparable materials and quality before claiming pilot success."
         return result
 
@@ -298,6 +304,16 @@ def create_app(engine=None, secure_cookies=True):
         if not result.rowcount:
             raise HTTPException(409, "Recommendation is unavailable or already approved")
         return {"status": "approved", "machine_control": False}
+
+    @app.get("/ready")
+    def ready():
+        try:
+            with app.state.engine.connect() as conn:
+                for table in db.metadata.sorted_tables:
+                    conn.execute(select(table).limit(0))
+        except SQLAlchemyError:
+            return JSONResponse({"status": "not_ready"}, status_code=503)
+        return {"status": "ready"}
 
     @app.get("/health")
     def health():

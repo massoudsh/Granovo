@@ -1,10 +1,13 @@
 import csv
 import io
 from datetime import date, timedelta
+from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import URL, select
+from sqlalchemy.schema import CreateSchema
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
@@ -13,13 +16,25 @@ from backend.app import create_app
 
 
 @pytest.fixture
-def setup(tmp_path):
-    engine = db.make_engine("sqlite:///" + str(tmp_path / "test.db"))
+def setup(tmp_path, database_backend, request):
+    if database_backend == "postgresql":
+        socket = request.config.getoption("--postgres-socket")
+        if not socket or not Path(socket).resolve().is_relative_to(Path(__file__).resolve().parents[1]):
+            pytest.fail("PostgreSQL integration tests require an isolated socket inside the project")
+        engine = db.make_engine(URL.create("postgresql+psycopg", database="postgres", query={"host": socket}))
+        schema = "test_" + uuid4().hex
+        with engine.begin() as conn:
+            conn.execute(CreateSchema(schema))
+        engine = engine.execution_options(schema_translate_map={None: schema})
+    else:
+        engine = db.make_engine("sqlite:///" + str(tmp_path / "test.db"))
     db.metadata.create_all(engine)
     app = create_app(engine)
-    with TestClient(app, base_url="https://testserver") as client:
-        yield client, app, engine
-    engine.dispose()
+    try:
+        with TestClient(app, base_url="https://testserver") as client:
+            yield client, app, engine
+    finally:
+        engine.dispose()
 
 
 def account(client, email="operator@example.com"):
@@ -158,6 +173,13 @@ def test_weighted_kpis_empty_filters_and_target(setup):
     assert result["pilot"]["reject_pct"] == 4.9
     assert result["reduction_percentage_points"] == 9.1
     assert result["pilot_below_target"] is True
+    assert len(result["daily"]) == 2
+    assert result["daily"][0] == {"produced_on": "2025-01-01", "phase": "baseline", "count": 2,
+        "total_kg": 1000, "rejected_kg": 140, "reject_pct": 14}
+    filtered = client.get("/api/kpis?start=2025-02-01").json()
+    assert filtered["baseline"]["count"] == 0
+    assert len(filtered["daily"]) == 1
+    assert filtered["daily"][0]["phase"] == "pilot"
     assert client.get("/api/kpis?start=2025-02-01").json()["baseline"]["count"] == 0
     assert client.get("/api/batches?end=2025-01-01").json()["total"] == 2
     assert client.get("/api/kpis?start=2025-02-02&end=2025-01-01").status_code == 422
@@ -192,6 +214,19 @@ def test_recommendations_data_gate_approval_and_isolation(setup):
     assert client.get("/api/recommendations").json()[0]["approved_by"] is not None
 
 
+def test_readiness_rejects_missing_schema_without_exposing_database_details(tmp_path):
+    engine = db.make_engine("sqlite:///" + str(tmp_path / "uninitialized.db"))
+    try:
+        with TestClient(create_app(engine), base_url="https://testserver") as client:
+            response = client.get("/ready")
+            assert response.status_code == 503
+            assert response.json() == {"status": "not_ready"}
+            assert "uninitialized.db" not in response.text
+            assert client.get("/health").status_code == 200
+    finally:
+        engine.dispose()
+
+
 def test_schema_compiles_for_postgresql():
     for table in db.metadata.sorted_tables:
         assert "CREATE TABLE" in str(CreateTable(table).compile(dialect=postgresql.dialect()))
@@ -200,6 +235,7 @@ def test_schema_compiles_for_postgresql():
 def test_static_security_and_health(setup):
     client, _, _ = setup
     assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/ready").json() == {"status": "ready"}
     response = client.get("/")
     assert response.status_code == 200
     assert response.headers["X-Frame-Options"] == "DENY"

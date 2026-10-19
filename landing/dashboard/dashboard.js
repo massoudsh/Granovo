@@ -102,6 +102,14 @@ function filters() {
 }
 
 function renderKpis(kpis) {
+  $("daily-empty").hidden = kpis.daily.length > 0;
+  $("daily-rows").replaceChildren(...kpis.daily.map((row) => {
+    const tr = element("tr");
+    tr.append(element("td", row.produced_on), element("td", row.phase === "pilot" ? "پایلوت" : "خط مبنا"),
+      element("td", format.format(row.count)), element("td", format.format(row.total_kg)),
+      element("td", format.format(row.rejected_kg)), element("td", `${format.format(row.reject_pct)}٪`));
+    return tr;
+  }));
   for (const phase of ["baseline", "pilot"]) {
     const row = kpis[phase];
     $(`${phase}-rate`).textContent = row.reject_pct === null ? "بدون داده" : `${format.format(row.reject_pct)}٪`;

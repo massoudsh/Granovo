@@ -4,6 +4,8 @@
 uploads/
 
 # Dependencies
+.runtime/
+*.deb
 node_modules/
 .pnp/
 .pnp.js
