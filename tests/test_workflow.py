@@ -201,6 +201,11 @@ def test_recommendations_data_gate_approval_and_isolation(setup):
     rec = response.json()
     assert rec["status"] == "pending_approval" and rec["approved_at"] is None
     assert rec["training_count"] == 8 and rec["evaluation"]["holdout_count"] == 2
+    assert rec["model_run_id"]
+    feedback = client.get("/api/feedback").json()
+    assert feedback["verified"]["count"] == 8 and feedback["pending"]["count"] == 0
+    assert feedback["retraining"] == "ready"
+    assert len(feedback["model_runs"]) == 1
     assert 200 <= rec["temperature_c"] <= 207
     assert rec["evaluation"]["holdout_mae"]["temperature_c"] >= 0
     assert client.post("/api/recommendations", json={**material, "purity_pct": 20}).status_code == 409
@@ -239,6 +244,7 @@ def test_static_security_and_health(setup):
     response = client.get("/")
     assert response.status_code == 200
     assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["X-Request-ID"]
     assert "script-src 'self'" in response.headers["Content-Security-Policy"]
     assert client.get("/dashboard/").status_code == 200
     assert client.get("/dashboard/dashboard.js").status_code == 200

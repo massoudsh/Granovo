@@ -89,6 +89,9 @@
             <p>محدوده‌ی مجاز را فقط از مشخصات تأییدشده‌ی دستگاه وارد کنید؛ این اعداد توصیه‌ی عملیاتی نیستند.</p>
             <form id="machine-form" class="fields two-columns">
               <label class="full-width">نام دستگاه<input name="name" maxlength="120" required></label>
+              <label>سازنده<input name="manufacturer" maxlength="120" value="Unknown" required></label>
+              <label>مدل<input name="model" maxlength="120" value="Unknown" required></label>
+              <label>نوع دستگاه<select name="machine_type"><option value="extruder">اکسترودر</option><option value="pelletizer">گرانول‌ساز</option><option value="washer">شست‌وشو</option></select></label>
               <label>حداقل دما (°C)<input name="temperature_min" type="number" min="0" max="500" step="any" required></label>
               <label>حداکثر دما (°C)<input name="temperature_max" type="number" min="0.01" max="500" step="any" required></label>
               <label>حداکثر سرعت (rpm)<input name="rpm_max" type="number" min="0.01" max="3000" step="any" required></label>

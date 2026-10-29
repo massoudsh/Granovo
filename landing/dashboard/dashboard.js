@@ -89,7 +89,7 @@ function renderMachines(machines) {
     if (machines.some((machine) => machine.id === selected)) select.value = selected;
   });
   $("machine-list").replaceChildren(...machines.map((machine) => {
-    const li = element("li", `${machine.name} · ${format.format(machine.temperature_min)}–${format.format(machine.temperature_max)} °C · ${format.format(machine.rpm_max)} rpm · ${format.format(machine.pressure_max)} bar`);
+    const li = element("li", `${machine.name} · ${machine.manufacturer} ${machine.model} · ${machine.machine_type} · ${format.format(machine.temperature_min)}–${format.format(machine.temperature_max)} °C · ${format.format(machine.rpm_max)} rpm · ${format.format(machine.pressure_max)} bar`);
     li.append(element("code", machine.id));
     return li;
   }));

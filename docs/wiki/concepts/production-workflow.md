@@ -5,12 +5,12 @@
 ## قرارداد داده و جریان
 
 - هر ثبت‌نام کارخانه‌ی مستقل می‌سازد؛ عضویت تیمی/نقش مدیر هنوز وجود ندارد. نشست ۱۲ساعته، رمز scrypt، کوکی Secure/HttpOnly و CSRF در نوشتن اجباری‌اند. تمام queryهای عملیاتی با factory_id حساب محدود می‌شوند.
-- دستگاه: نام، temperature_min/max (°C)، rpm_max و pressure_max (bar). دستگاه دیگر کارخانه قابل انتخاب یا ثبت بچ نیست.
+- دستگاه: نام، سازنده، مدل، machine_type در extruder/pelletizer/washer و حدود دما، سرعت و فشار که کاربر از مشخصات تأییدشده وارد می‌کند.
 - بچ: code یکتا در کارخانه، produced_on، phase=baseline/pilot، machine_id/operator_id، polymer=PE/PP/PET/PS/PVC/ABS، purity_pct، moisture_pct، temperature_c، screw_rpm، pressure_bar، total_kg و rejected_kg.
 - تاریخ آینده، مقادیر غیرمتناهی، rejected_kg بیشتر از کل و تنظیمات خارج از حدود دستگاه رد می‌شوند. تأیید کیفیت جداگانه با quality_verified_by/at ثبت می‌شود؛ ورود CSV خودکار تأیید نمی‌شود.
 - CSV: UTF-8، هدر دقیق مطابق Batch، حداکثر ۵۰۰ ردیف/۱MB؛ تراکنش همه یا هیچ. قالب از داشبورد دریافت می‌شود.
 - KPI: sum(rejected_kg)/sum(total_kg)*100، جدا برای خط مبنا/پایلوت. آرایه‌ی daily همین محاسبه‌ی وزن‌دار را به تفکیک تاریخ و مرحله به UI جدول روند می‌دهد. بدون داده مقدار null است، نه صفر. هدف واقعاً کمتر از ۵٪ و کاهش به واحد درصد است. start/end/machine_id روی KPI و تاریخچه یکسان‌اند؛ KPI کل نتایج را حساب می‌کند، نه فقط ۲۰۰ ردیف تاریخچه.
-- داشبورد فارسی `/dashboard/`: ثبت حساب/دستگاه/بچ، ورود CSV، تأیید دستی کیفیت، فیلتر عملکرد و [[entities/extruder-parameter-predictor]] با تأیید اپراتور. هیچ داده‌ی demo seed نمی‌شود.
+- داشبورد فارسی `/dashboard/`: ثبت حساب/دستگاه/بچ، ورود CSV، تأیید دستی کیفیت، فیلتر عملکرد و [[entities/extruder-parameter-predictor]] با تأیید اپراتور. `/api/feedback` وضعیت داده‌ی verified/pending و مدل‌ران‌ها را برای audit/retraining نشان می‌دهد. هیچ داده‌ی demo seed نمی‌شود.
 
 ## ذخیره‌سازی و استقرار
 

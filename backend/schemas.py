@@ -23,6 +23,9 @@ class Registration(Login):
 
 class Machine(Input):
     name: Text
+    manufacturer: Text = "Unknown"
+    model: Text = "Unknown"
+    machine_type: Literal["extruder", "pelletizer", "washer"] = "extruder"
     temperature_min: Annotated[Finite, Field(ge=0, le=500)]
     temperature_max: Annotated[Finite, Field(gt=0, le=500)]
     rpm_max: Annotated[Finite, Field(gt=0, le=3000)]

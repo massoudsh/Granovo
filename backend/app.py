@@ -2,6 +2,8 @@ import csv
 from datetime import date
 import hashlib
 import io
+import json
+import logging
 import secrets
 import time
 from collections import defaultdict, deque
@@ -13,6 +15,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from opentelemetry import trace
 from pydantic import ValidationError
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -21,6 +24,8 @@ from backend import db, schemas
 from backend.predictor import predict
 
 ROOT = Path(__file__).resolve().parents[1]
+logger = logging.getLogger("granovo.api")
+tracer = trace.get_tracer("granovo.api")
 
 
 def digest(value):
@@ -42,6 +47,24 @@ def create_app(engine=None, secure_cookies=True):
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request, exc):
         return JSONResponse({"detail": "Invalid input; check required fields, dates, units and numeric limits"}, status_code=422)
+
+    @app.middleware("http")
+    async def request_log(request, call_next):
+        request_id = request.headers.get("x-request-id") or str(uuid4())
+        started = time.perf_counter()
+        try:
+            with tracer.start_as_current_span("http.request") as span:
+                span.set_attribute("http.request.method", request.method)
+                span.set_attribute("url.path", request.url.path)
+                response = await call_next(request)
+                span.set_attribute("http.response.status_code", response.status_code)
+        except Exception:
+            logger.exception(json.dumps({"event": "request_failed", "request_id": request_id, "method": request.method, "path": request.url.path}))
+            raise
+        logger.info(json.dumps({"event": "request_completed", "request_id": request_id, "method": request.method,
+            "path": request.url.path, "status": response.status_code, "duration_ms": round((time.perf_counter() - started) * 1000, 2)}))
+        response.headers["X-Request-ID"] = request_id
+        return response
 
     @app.middleware("http")
     async def security(request, call_next):
@@ -279,11 +302,33 @@ def create_app(engine=None, secure_cookies=True):
         settings = prediction["settings"]
         if not machine["temperature_min"] <= settings["temperature_c"] <= machine["temperature_max"] or settings["screw_rpm"] > machine["rpm_max"] or settings["pressure_bar"] > machine["pressure_max"]:
             raise HTTPException(409, "Estimate exceeds registered machine limits")
+        model_run_id = str(uuid4())
+        conn.execute(insert(db.model_runs).values(id=model_run_id, factory_id=user["factory_id"], machine_id=data.machine_id,
+            polymer=data.polymer, model_version=prediction["model_version"], training_count=prediction["training_count"],
+            holdout_count=prediction["holdout_count"], evaluation=prediction, created_by=user["id"], created_at=time.time()))
         values = dict(id=str(uuid4()), factory_id=user["factory_id"], requested_by=user["id"], **data.model_dump(),
-            model_version=prediction["model_version"], training_count=prediction["training_count"], evaluation=prediction,
+            model_version=prediction["model_version"], model_run_id=model_run_id, training_count=prediction["training_count"], evaluation=prediction,
             **settings, created_at=time.time(), approved_by=None, approved_at=None)
         conn.execute(insert(db.recommendations).values(**values))
         return {**values, "evaluation": prediction, "status": "pending_approval"}
+
+    @app.get("/api/feedback")
+    def feedback(machine_id: str | None = None, user=Depends(authenticated), conn=Depends(connection)):
+        conditions = [db.batches.c.factory_id == user["factory_id"]]
+        if machine_id:
+            conditions.append(db.batches.c.machine_id == machine_id)
+        counts = conn.execute(select(db.batches.c.quality_verified, func.count().label("count"),
+            func.sum(db.batches.c.total_kg).label("total_kg"), func.sum(db.batches.c.rejected_kg).label("rejected_kg"))
+            .where(*conditions).group_by(db.batches.c.quality_verified)).mappings()
+        result = {"verified": {"count": 0, "total_kg": 0, "rejected_kg": 0}, "pending": {"count": 0, "total_kg": 0, "rejected_kg": 0}}
+        for row in counts:
+            result["verified" if row["quality_verified"] else "pending"] = {"count": row["count"], "total_kg": row["total_kg"] or 0, "rejected_kg": row["rejected_kg"] or 0}
+        model_conditions = [db.model_runs.c.factory_id == user["factory_id"]]
+        if machine_id:
+            model_conditions.append(db.model_runs.c.machine_id == machine_id)
+        result["model_runs"] = [dict(row) for row in conn.execute(select(db.model_runs).where(*model_conditions).order_by(db.model_runs.c.created_at.desc()).limit(50)).mappings()]
+        result["retraining"] = "ready" if result["verified"]["count"] >= 8 else "collect_verified_batches"
+        return result
 
     @app.get("/api/recommendations")
     def list_recommendations(user=Depends(authenticated), conn=Depends(connection)):
