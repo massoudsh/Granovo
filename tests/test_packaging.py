@@ -23,10 +23,20 @@ def test_compose_defines_isolated_app_and_healthy_database():
     assert app["security_opt"] == ["no-new-privileges:true"]
     assert "/tmp" in app["tmpfs"]
 
-    assert database["image"].startswith("postgres:17")
+    assert database["image"] == "${POSTGRES_IMAGE:-postgres:17-alpine}"
     assert "pg_isready" in database["healthcheck"]["test"][1]
     assert database["volumes"] == ["granovo-db:/var/lib/postgresql/data"]
     assert "granovo-db" in compose["volumes"]
+
+
+def test_base_images_can_be_overridden_for_a_registry_mirror():
+    compose = yaml.safe_load(read("docker-compose.yml"))
+    assert compose["services"]["app"]["build"]["args"]["PYTHON_IMAGE"] == "${PYTHON_IMAGE:-python:3.12-slim}"
+    dockerfile = read("Dockerfile")
+    assert "ARG PYTHON_IMAGE=python:3.12-slim" in dockerfile
+    assert dockerfile.count("FROM ${PYTHON_IMAGE}") == 2
+    env = read(".env.docker.example")
+    assert "POSTGRES_IMAGE=" in env and "PYTHON_IMAGE=" in env
 
 
 def test_compose_requires_a_database_password():
@@ -35,7 +45,7 @@ def test_compose_requires_a_database_password():
 
 def test_dockerfile_is_multi_stage_non_root_and_health_checked():
     dockerfile = read("Dockerfile")
-    assert dockerfile.count("FROM python:3.12-slim") == 2
+    assert dockerfile.count("FROM ${PYTHON_IMAGE}") == 2
     assert "USER granovo" in dockerfile
     assert "HEALTHCHECK" in dockerfile and "/health" in dockerfile
     assert "COPY --chown=granovo:granovo backend ./backend" in dockerfile

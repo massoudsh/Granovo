@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:17-alpine
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
     environment:
       POSTGRES_DB: granovo
       POSTGRES_USER: granovo
@@ -20,6 +20,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim}
     depends_on:
       db:
         condition: service_healthy

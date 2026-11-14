@@ -57,6 +57,47 @@ Notes:
 - Schema creation is idempotent but is not a migration tool. Back up the `granovo-db` volume before upgrades.
 - The password is embedded in `DATABASE_URL`, so use a URL-safe value or percent-encode it.
 
+### If Docker Hub is unreachable
+
+`Error response from daemon: Get "https://registry-1.docker.io/v2/": EOF` means the daemon cannot reach Docker Hub, not that the project is broken. Pick one:
+
+1. **Use a mirror.** Set both base images in `.env` to a reachable registry:
+
+   ```sh
+   POSTGRES_IMAGE=mirror.example.com/library/postgres:17-alpine
+   PYTHON_IMAGE=mirror.example.com/library/python:3.12-slim
+   docker compose up --build -d
+   ```
+
+   For a global mirror, configure `/etc/docker/daemon.json` with `"registry-mirrors": ["https://<mirror>"]` and restart Docker.
+
+2. **Load images from another machine.** On a host with access:
+
+   ```sh
+   docker pull postgres:17-alpine
+   docker save postgres:17-alpine | gzip > postgres-17-alpine.tar.gz
+   ```
+
+   Then on the offline host:
+
+   ```sh
+   gunzip -c postgres-17-alpine.tar.gz | docker load
+   docker build -t granovo:local .
+   ```
+
+3. **Skip Docker entirely.** The app runs directly with Python and SQLite:
+
+   ```sh
+   python -m venv .venv && . .venv/bin/activate
+   pip install -r requirements-dev.txt
+   python -m backend.db
+   GRANOVO_ALLOW_HTTP=1 python -m backend
+   ```
+
+   Then open `http://127.0.0.1:8000/`. This is fine for local evaluation; use PostgreSQL for anything shared.
+
+Note that `docker-compose` (v1) and `docker compose` (v2) are different commands. If `docker-compose` is missing, use `docker compose`. Also check for typos: `docdocker build` is not a command.
+
 ## Architecture
 
 The static landing page and RTL operator dashboard are served by the FastAPI application. The API validates input with Pydantic, stores factory-scoped operational records with SQLAlchemy, and exposes liveness (`/health`) and schema/database readiness (`/ready`). The recommendation service uses only quality-verified historical batches for the same factory, machine, and polymer; it is not an industrial model and never controls equipment.

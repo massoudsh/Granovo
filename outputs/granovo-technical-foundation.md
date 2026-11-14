@@ -56,6 +56,7 @@ python -m backend
 - `requirements.txt` فقط وابستگی runtime دارد؛ `requirements-dev.txt` ابزار تست (pytest/httpx/pyyaml) را اضافه می‌کند و CI از آن استفاده می‌کند.
 - متغیرهای `GRANOVO_HOST`، `GRANOVO_PORT`، `GRANOVO_ALLOW_HTTP` و `GRANOVO_FORWARDED_ALLOW_IPS` در `backend/__main__.py` خوانده می‌شوند و در `.env.example`/`.env.docker.example` مستند شده‌اند.
 - `tests/test_packaging.py` سازگاری compose/Dockerfile/entrypoint/requirements را بدون اجرای Docker بررسی می‌کند. build واقعی ایمیج در این محیط اجرا نشده است (محدودیت منابع کانتینر) و باید روی سرور یا CI انجام شود.
+- اگر Docker Hub در دسترس نباشد (`registry-1.docker.io ... EOF`)، ایمیج‌های پایه با `POSTGRES_IMAGE` و `PYTHON_IMAGE` در `.env` قابل تغییر به mirror هستند؛ یا ایمیج با `docker save`/`docker load` منتقل می‌شود. اجرای بدون Docker با venv و SQLite نیز مستند شده است.
 
 ```sh
 python -m pytest -q
