@@ -3,17 +3,25 @@
 # Override to use a registry mirror, e.g.
 #   docker build --build-arg PYTHON_IMAGE=mirror.example.com/library/python:3.12-slim .
 ARG PYTHON_IMAGE=python:3.12-slim
+# Override to use a PyPI mirror, e.g. https://mirror-pypi.runflare.com/simple
+ARG PIP_INDEX_URL=https://pypi.org/simple
 
 FROM ${PYTHON_IMAGE} AS builder
 
+ARG PIP_INDEX_URL
+
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_RETRIES=10 \
+    PIP_TIMEOUT=120 \
+    PIP_DEFAULT_TIMEOUT=120
 
 WORKDIR /build
 COPY requirements.txt ./
 RUN python -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
-    && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+    && /opt/venv/bin/pip install --no-cache-dir --prefer-binary -r requirements.txt
 
 
 FROM ${PYTHON_IMAGE} AS runtime

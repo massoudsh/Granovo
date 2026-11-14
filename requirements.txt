@@ -1,4 +1,9 @@
+# Runtime dependencies. Fully pinned, including the pydantic/starlette pair,
+# so pip never backtracks through dozens of versions on a slow connection.
 fastapi==0.147.0
+starlette==1.10.0
+pydantic==2.14.3
+pydantic-core==2.50.4
 sqlalchemy==2.1.5
 psycopg[binary]==3.3.6
 uvicorn==0.54.0

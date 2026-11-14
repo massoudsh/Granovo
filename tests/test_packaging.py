@@ -43,6 +43,27 @@ def test_compose_requires_a_database_password():
     assert "${POSTGRES_PASSWORD:?" in read("docker-compose.yml")
 
 
+def test_pip_index_is_overridable_and_retries_are_bounded():
+    dockerfile = read("Dockerfile")
+    assert "ARG PIP_INDEX_URL=https://pypi.org/simple" in dockerfile
+    assert "PIP_INDEX_URL=${PIP_INDEX_URL}" in dockerfile
+    assert "PIP_RETRIES=10" in dockerfile
+    assert "PIP_TIMEOUT=120" in dockerfile
+    assert "--prefer-binary" in dockerfile
+    compose = yaml.safe_load(read("docker-compose.yml"))
+    assert compose["services"]["app"]["build"]["args"]["PIP_INDEX_URL"] == "${PIP_INDEX_URL:-https://pypi.org/simple}"
+    assert "PIP_INDEX_URL=" in read(".env.docker.example")
+
+
+def test_runtime_requirements_pin_the_resolver_critical_packages():
+    lines = [line.strip() for line in read("requirements.txt").splitlines() if line.strip() and not line.startswith("#")]
+    pinned = dict(line.split("==", 1) for line in lines if "==" in line)
+    # Unpinned pydantic/starlette let pip backtrack through dozens of versions.
+    for package in ("fastapi", "starlette", "pydantic", "pydantic-core", "sqlalchemy", "uvicorn"):
+        assert package in pinned, package
+    assert all("==" in line for line in lines), lines
+
+
 def test_dockerfile_is_multi_stage_non_root_and_health_checked():
     dockerfile = read("Dockerfile")
     assert dockerfile.count("FROM ${PYTHON_IMAGE}") == 2

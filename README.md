@@ -98,6 +98,24 @@ Notes:
 
 Note that `docker-compose` (v1) and `docker compose` (v2) are different commands. If `docker-compose` is missing, use `docker compose`. Also check for typos: `docdocker build` is not a command.
 
+### If the pip install step is slow or fails
+
+`ERROR: ResolutionImpossible` with a long list of pydantic versions means pip could not download a wheel and started backtracking. On a slow link this can run for 20+ minutes. The requirements are now fully pinned, so pip resolves in one pass. If `pypi.org` is still slow or blocked, point the build at a mirror:
+
+```sh
+# in .env
+PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple
+docker compose build --no-cache app
+```
+
+Or pass it directly:
+
+```sh
+docker build --build-arg PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple -t granovo:local .
+```
+
+The build also sets `PIP_RETRIES=10` and `PIP_TIMEOUT=120` and uses `--prefer-binary`, so a flaky connection retries instead of failing. All pinned packages have ARM64 wheels, so no compiler is needed on Apple Silicon or ARM servers.
+
 ## Architecture
 
 The static landing page and RTL operator dashboard are served by the FastAPI application. The API validates input with Pydantic, stores factory-scoped operational records with SQLAlchemy, and exposes liveness (`/health`) and schema/database readiness (`/ready`). The recommendation service uses only quality-verified historical batches for the same factory, machine, and polymer; it is not an industrial model and never controls equipment.
