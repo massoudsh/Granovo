@@ -5,7 +5,7 @@ Granovo is an AI-assisted workflow for improving plastic-recycling production. T
 ## Quickstart
 
 ```sh
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 python -m backend.db
 python -m backend --allow-http
 ```
@@ -22,6 +22,40 @@ python tests/run_postgres.py --bin-dir <postgres-bin-directory>
 ```
 
 The PostgreSQL runner creates a disposable socket-only cluster, runs the integration suite, verifies a dump/restore, and removes the cluster. It must never receive production credentials or connect to a production database.
+
+## Docker
+
+The image runs as a non-root user, installs only runtime dependencies, and starts through an entrypoint that creates the schema (with retries) before serving.
+
+```sh
+cp .env.docker.example .env
+# edit .env and set a long, URL-safe POSTGRES_PASSWORD
+docker compose up --build -d
+docker compose ps
+curl -fsS http://127.0.0.1:8000/health
+curl -fsS http://127.0.0.1:8000/ready
+```
+
+Open `http://127.0.0.1:8000/` for the landing page and `/dashboard/` for the operator workspace. Stop with `docker compose down`; add `-v` only when you intend to delete the database volume.
+
+Image only, against an existing PostgreSQL:
+
+```sh
+docker build -t granovo:local .
+docker run --rm -p 127.0.0.1:8000:8000 \
+  -e DATABASE_URL='postgresql+psycopg://user:password@host:5432/granovo' \
+  -e GRANOVO_ALLOW_HTTP=1 \
+  granovo:local
+```
+
+Notes:
+
+- `GRANOVO_ALLOW_HTTP=1` disables Secure cookies and is for local HTTP only. Behind HTTPS set it to `0`.
+- `GRANOVO_FORWARDED_ALLOW_IPS` must list the reverse proxy address; the default trusts only loopback.
+- The compose file publishes the port on `127.0.0.1` only. Put a TLS-terminating proxy in front for remote access.
+- The app container is read-only with all capabilities dropped; `/tmp` is a tmpfs.
+- Schema creation is idempotent but is not a migration tool. Back up the `granovo-db` volume before upgrades.
+- The password is embedded in `DATABASE_URL`, so use a URL-safe value or percent-encode it.
 
 ## Architecture
 

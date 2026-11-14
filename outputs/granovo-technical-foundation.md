@@ -39,7 +39,7 @@
 ## اجرای برنامه و تست
 
 ```sh
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 python -m backend.db
 python -m backend
 ```
@@ -47,6 +47,15 @@ python -m backend
 `python -m backend.db` فقط schema اولیه را با روش idempotent می‌سازد؛ ساختار دیتابیس موجود را migrate نمی‌کند. SQLite توسعه در فایل نادیده‌گرفته‌شده‌ی `granovo.db` است. برای PostgreSQL، `DATABASE_URL` را از تنظیمات امن استقرار با dialect `postgresql+psycopg` تنظیم کنید؛ مقادیر اتصال نباید در گیت ثبت شوند.
 
 برنامه به‌طور پیش‌فرض روی loopback اجرا می‌شود و کوکی Secure دارد. برای production، پراکسی HTTPS هم‌مبدأ باید Host را حفظ و scheme را از loopback مورد اعتماد forward کند. گزینه‌ی `--allow-http` فقط برای توسعه‌ی محلی ایزوله است و نباید در production استفاده شود. این اجرا سرور دائمی یا استقرار انجام نمی‌دهد.
+
+## بسته‌بندی Docker
+
+- `Dockerfile` دو مرحله‌ای است: نصب وابستگی‌های runtime در venv، سپس ایمیج `python:3.12-slim` با کاربر غیرroot (`uid 10001`)، `HEALTHCHECK` روی `/health` و `ENTRYPOINT` اسکریپت.
+- `docker/entrypoint.sh` قبل از اجرای دستور، `python -m backend.db` را با retry انجام می‌دهد؛ `GRANOVO_SKIP_DB_INIT=1` آن را غیرفعال می‌کند و `GRANOVO_DB_INIT_ATTEMPTS`/`GRANOVO_DB_INIT_DELAY` رفتار retry را تنظیم می‌کنند.
+- `docker-compose.yml` سرویس `app` و `db` (PostgreSQL 17) را با healthcheck، volume پایدار و `depends_on: service_healthy` بالا می‌آورد. پورت فقط روی `127.0.0.1` منتشر می‌شود؛ کانتینر app با `read_only`، `cap_drop: ALL` و `no-new-privileges` اجرا می‌شود.
+- `requirements.txt` فقط وابستگی runtime دارد؛ `requirements-dev.txt` ابزار تست (pytest/httpx/pyyaml) را اضافه می‌کند و CI از آن استفاده می‌کند.
+- متغیرهای `GRANOVO_HOST`، `GRANOVO_PORT`، `GRANOVO_ALLOW_HTTP` و `GRANOVO_FORWARDED_ALLOW_IPS` در `backend/__main__.py` خوانده می‌شوند و در `.env.example`/`.env.docker.example` مستند شده‌اند.
+- `tests/test_packaging.py` سازگاری compose/Dockerfile/entrypoint/requirements را بدون اجرای Docker بررسی می‌کند. build واقعی ایمیج در این محیط اجرا نشده است (محدودیت منابع کانتینر) و باید روی سرور یا CI انجام شود.
 
 ```sh
 python -m pytest -q

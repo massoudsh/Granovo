@@ -18,6 +18,10 @@ SQLAlchemy schema برای PostgreSQL+psycopg و SQLite توسعه. `python -m b
 
 فایل SQLite و دیتابیس‌های تست از گیت مستثنا هستند. `tests/run_postgres.py` یک cluster موقت socket-only با دسترسی مالک می‌سازد، تست‌ها را روی PostgreSQL 17 واقعی و SQLite اجرا و dump/restore داده‌ی آزمایشی را با شمارش بچ‌ها بررسی می‌کند؛ در پایان cluster متوقف و حذف می‌شود. `/ready` اتصال و تمام جدول‌های schema را چک می‌کند و در نقص دیتابیس بدون افشای جزئیات ۵۰۳ می‌دهد؛ `/health` فقط liveness است. مرورگر، استقرار و فرایند دائمی ایجاد نشده‌اند.
 
+### بسته‌بندی Docker
+
+`Dockerfile` دو مرحله‌ای با کاربر غیرroot، `HEALTHCHECK` روی `/health` و `ENTRYPOINT` (`docker/entrypoint.sh`) که schema را با retry می‌سازد. `docker-compose.yml` سرویس‌های `app` و `db` (PostgreSQL 17) را با healthcheck و volume پایدار بالا می‌آورد؛ پورت فقط روی loopback منتشر می‌شود و کانتینر app با `read_only`، `cap_drop: ALL` و `no-new-privileges` اجرا می‌شود. `requirements.txt` فقط runtime است و `requirements-dev.txt` ابزار تست را دارد. متغیرهای `GRANOVO_HOST/PORT/ALLOW_HTTP/FORWARDED_ALLOW_IPS` در `backend/__main__.py` خوانده می‌شوند. `tests/test_packaging.py` سازگاری این فایل‌ها را بدون Docker بررسی می‌کند؛ build واقعی ایمیج در این محیط اجرا نشده و باید روی سرور/CI انجام شود.
+
 ## محدودیت‌ها
 
 این MVP جایگزین مصاحبه/پایلوت واقعی، آزمایش کیفیت، مدل صنعتی یا کنترل PLC نیست. ترکیب چندجزئی، تصویر/طیف، نقش‌های تیمی، بازیابی رمز و limiter مشترک هنوز وجود ندارند. قبل از production، اتصال سرور پروژه، HTTPS، پشتیبان‌گیری واقعی، بازبینی امنیت و تست بصری لازم‌اند. #14 با روند کیفیت پیش رفته ولی بخش انرژی/فروش آن انجام نشده است. جزئیات مسیرها، CSV، راه‌اندازی و موانع هر issue در `outputs/granovo-technical-foundation.md` است.
@@ -31,3 +35,5 @@ SQLAlchemy schema برای PostgreSQL+psycopg و SQLite توسعه. `python -m b
 - `landing/dashboard/dashboard.js:104` — کارت KPI/روند روزانه؛ `landing/dashboard/dashboard.js:172` — ورود به workspace
 - `backend/app.py:309` — readiness اتصال و schema؛ `tests/run_postgres.py:1` — cluster ایزوله و بازیابی backup
 - `tests/test_workflow.py:1` و `tests/dashboard.test.cjs:1` — آزمون‌های backend و UI بدون مرورگر
+- `Dockerfile:1`، `docker-compose.yml:1`، `docker/entrypoint.sh:1` — بسته‌بندی و راه‌اندازی کانتینر
+- `tests/test_packaging.py:1` — بررسی سازگاری Docker/compose/requirements

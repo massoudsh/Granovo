@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: granovo
+      POSTGRES_USER: granovo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - granovo-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U granovo -d granovo"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://granovo:${POSTGRES_PASSWORD}@db:5432/granovo
+      GRANOVO_ALLOW_HTTP: ${GRANOVO_ALLOW_HTTP:-0}
+      GRANOVO_FORWARDED_ALLOW_IPS: ${GRANOVO_FORWARDED_ALLOW_IPS:-127.0.0.1}
+    ports:
+      - "127.0.0.1:${GRANOVO_PORT:-8000}:8000"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  granovo-db:

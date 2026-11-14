@@ -9,3 +9,5 @@
 ## [2026-10-19] update | MVP تولید و پیشنهاد آزمایشی تکمیل شد؛ روند روزانه، readiness و ۳۲ تست backend روی PostgreSQL/SQLite به‌همراه ۸ تست UI و بازیابی backup آزمایشی تأیید شد؛ شش issue برای بستن بازبینی شدند، استقرار و پایلوت صنعتی هنوز انجام نشده‌اند.
 
 ## [2026-10-19] update | CI/security hardening، معماری و threat model، لاگ ساختاری/OpenTelemetry، پروفایل دستگاه‌های چندنوعی و audit حلقه‌ی بازخورد با model_runs و endpoint feedback اضافه شد؛ تست PostgreSQL/SQLite و بازیابی backup دوباره پاس شد.
+
+## [2026-11-14] update | بسته‌بندی Docker (Dockerfile چندمرحله‌ای غیرroot، compose با PostgreSQL، entrypoint با retry، .dockerignore)، جداسازی requirements runtime/dev، متغیرهای محیطی سرور و تست packaging اضافه شد؛ build ایمیج در این محیط اجرا نشد.

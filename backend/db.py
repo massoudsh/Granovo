@@ -96,7 +96,8 @@ recommendations = Table("recommendations", metadata,
 
 
 def make_engine(url=None):
-    default = "sqlite:///" + str(Path(__file__).resolve().parents[1] / "granovo.db")
+    data_dir = Path(os.environ.get("GRANOVO_DATA_DIR", Path(__file__).resolve().parents[1]))
+    default = "sqlite:///" + str(data_dir / "granovo.db")
     engine = create_engine(url or os.environ.get("DATABASE_URL", default), hide_parameters=True)
     if engine.dialect.name == "sqlite":
         @event.listens_for(engine, "connect")
@@ -106,7 +107,16 @@ def make_engine(url=None):
 
 
 if __name__ == "__main__":
+    import sys
+
+    from sqlalchemy.exc import SQLAlchemyError
+
     engine = make_engine()
-    metadata.create_all(engine)
-    engine.dispose()
+    try:
+        metadata.create_all(engine)
+    except SQLAlchemyError as error:
+        print(f"Schema initialization failed: {type(error).__name__}", file=sys.stderr)
+        sys.exit(1)
+    finally:
+        engine.dispose()
     print("Initial schema ready. Existing tables were not changed.")

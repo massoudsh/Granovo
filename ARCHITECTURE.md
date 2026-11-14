@@ -33,6 +33,10 @@ flowchart TD
 6. After at least eight good verified batches for the same factory/machine/polymer, the experimental predictor estimates settings inside the registered machine limits. It stores a model fingerprint and holdout metrics.
 7. Approval re-computes the fingerprint and rejects stale recommendations. Approval is an audit record only; no equipment command exists.
 
+## Container topology
+
+`docker-compose.yml` runs two services on a private network: `app` (the image built from `Dockerfile`) and `db` (PostgreSQL 17 with a named volume). The app waits for the database healthcheck, then the entrypoint creates the schema with bounded retries before starting Uvicorn on `0.0.0.0:8000`. Only `127.0.0.1:${GRANOVO_PORT}` is published; a TLS-terminating proxy belongs in front for remote access. The app container is read-only, drops all capabilities, and uses a tmpfs for `/tmp`.
+
 ## Operational boundaries
 
 `/health` checks process liveness. `/ready` checks every schema table and returns a generic 503 when the database is unavailable or uninitialized. Production requires HTTPS, a shared rate limiter, backups with retention and recovery drills, role-based access, migration tooling, and monitoring. The local runner never connects to production.
