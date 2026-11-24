@@ -1,5 +1,5 @@
 import csv
-from datetime import date
+from datetime import date, timedelta
 import hashlib
 import io
 import json
@@ -64,6 +64,8 @@ def create_app(engine=None, secure_cookies=True):
         logger.info(json.dumps({"event": "request_completed", "request_id": request_id, "method": request.method,
             "path": request.url.path, "status": response.status_code, "duration_ms": round((time.perf_counter() - started) * 1000, 2)}))
         response.headers["X-Request-ID"] = request_id
+        if request.url.path.startswith("/public/"):
+            response.headers["Access-Control-Allow-Origin"] = "*"
         return response
 
     @app.middleware("http")
@@ -329,6 +331,194 @@ def create_app(engine=None, secure_cookies=True):
         result["model_runs"] = [dict(row) for row in conn.execute(select(db.model_runs).where(*model_conditions).order_by(db.model_runs.c.created_at.desc()).limit(50)).mappings()]
         result["retraining"] = "ready" if result["verified"]["count"] >= 8 else "collect_verified_batches"
         return result
+
+    # --- Predictive maintenance: downtime and availability ---
+    @app.post("/api/downtime", status_code=201)
+    def add_downtime(data: schemas.Downtime, user=Depends(authenticated), conn=Depends(connection)):
+        machine_for(conn, user, data.machine_id)
+        values = dict(id=str(uuid4()), factory_id=user["factory_id"], created_by=user["id"],
+                      created_at=time.time(), **data.model_dump(mode="json"))
+        conn.execute(insert(db.downtime_events).values(**values))
+        return values
+
+    def downtime_conditions(user, machine_id, start, end):
+        if start and end and start > end:
+            raise HTTPException(422, "Start date must not follow end date")
+        conditions = [db.downtime_events.c.factory_id == user["factory_id"]]
+        if machine_id:
+            conditions.append(db.downtime_events.c.machine_id == machine_id)
+        if start:
+            conditions.append(db.downtime_events.c.started_on >= start.isoformat())
+        if end:
+            conditions.append(db.downtime_events.c.started_on <= end.isoformat())
+        return conditions
+
+    @app.get("/api/downtime")
+    def list_downtime(machine_id: str | None = None, start: date | None = None, end: date | None = None,
+                      user=Depends(authenticated), conn=Depends(connection)):
+        conditions = downtime_conditions(user, machine_id, start, end)
+        rows = conn.execute(select(db.downtime_events).where(*conditions)
+                            .order_by(db.downtime_events.c.started_on.desc(), db.downtime_events.c.created_at.desc()).limit(200)).mappings()
+        return {"items": [dict(row) for row in rows]}
+
+    @app.get("/api/availability")
+    def availability(machine_id: str | None = None, window_days: int = 30,
+                     user=Depends(authenticated), conn=Depends(connection)):
+        if not 1 <= window_days <= 365:
+            raise HTTPException(422, "window_days must be between 1 and 365")
+        if machine_id:
+            machine_for(conn, user, machine_id)
+            machines = [machine_id]
+        else:
+            machines = [row["id"] for row in conn.execute(select(db.machines.c.id).where(db.machines.c.factory_id == user["factory_id"])).mappings()]
+        since = (date.today() - timedelta(days=window_days - 1)).isoformat()
+        window_minutes = float(window_days * 24 * 60)
+        rows = conn.execute(select(db.downtime_events.c.machine_id, db.downtime_events.c.kind,
+            func.count().label("events"), func.sum(db.downtime_events.c.minutes).label("minutes"))
+            .where(db.downtime_events.c.factory_id == user["factory_id"],
+                   db.downtime_events.c.started_on >= since).group_by(db.downtime_events.c.machine_id, db.downtime_events.c.kind)).mappings()
+        per_machine = {item: {"machine_id": item, "events": 0, "downtime_minutes": 0.0, "minutes_by_kind": {}} for item in machines}
+        for row in rows:
+            if row["machine_id"] not in per_machine:
+                continue
+            entry = per_machine[row["machine_id"]]
+            entry["events"] += row["events"]
+            entry["downtime_minutes"] += row["minutes"]
+            entry["minutes_by_kind"][row["kind"]] = round(row["minutes"], 2)
+        results = []
+        for entry in per_machine.values():
+            lost = min(entry["downtime_minutes"], window_minutes)
+            entry["downtime_minutes"] = round(entry["downtime_minutes"], 2)
+            entry["availability_pct"] = round((window_minutes - lost) / window_minutes * 100, 3)
+            entry["mtbf_minutes"] = round((window_minutes - lost) / entry["events"], 1) if entry["events"] else None
+            results.append(entry)
+        overall_lost = sum(min(per_machine[item]["downtime_minutes"], window_minutes) for item in machines)
+        overall_window = window_minutes * max(1, len(machines))
+        return {"window_days": window_days, "since": since, "machines": results,
+                "overall": {"machine_count": len(machines),
+                            "availability_pct": round((overall_window - overall_lost) / overall_window * 100, 3) if machines else None,
+                            "downtime_minutes": round(sum(per_machine[item]["downtime_minutes"] for item in machines), 2)},
+                "notice": "Calendar-window availability, not OEE. It assumes a machine could run for the whole window and does not model planned production hours or output quality."}
+
+    # --- Recyclate price book and rejection cost ---
+    @app.get("/api/prices")
+    def list_prices(user=Depends(authenticated), conn=Depends(connection)):
+        return [dict(row) for row in conn.execute(select(db.polymer_prices).where(db.polymer_prices.c.factory_id == user["factory_id"]).order_by(db.polymer_prices.c.polymer)).mappings()]
+
+    @app.put("/api/prices")
+    def set_price(data: schemas.PolymerPrice, user=Depends(authenticated), conn=Depends(connection)):
+        values = dict(factory_id=user["factory_id"], polymer=data.polymer, price_per_kg=data.price_per_kg,
+                      currency=data.currency, updated_by=user["id"], updated_at=time.time())
+        existing = conn.execute(select(db.polymer_prices.c.id).where(db.polymer_prices.c.factory_id == user["factory_id"],
+            db.polymer_prices.c.polymer == data.polymer)).scalar_one_or_none()
+        if existing:
+            conn.execute(update(db.polymer_prices).where(db.polymer_prices.c.id == existing).values(**values))
+            values["id"] = existing
+        else:
+            values["id"] = str(uuid4())
+            conn.execute(insert(db.polymer_prices).values(**values))
+        return values
+
+    @app.get("/api/value-report")
+    def value_report(machine_id: str | None = None, start: date | None = None, end: date | None = None,
+                     user=Depends(authenticated), conn=Depends(connection)):
+        conditions = batch_filter(user, machine_id, start, end)
+        prices = {row["polymer"]: row for row in conn.execute(select(db.polymer_prices).where(db.polymer_prices.c.factory_id == user["factory_id"])).mappings()}
+        rows = conn.execute(select(db.batches.c.polymer, func.count().label("batches"),
+            func.sum(db.batches.c.total_kg).label("total_kg"), func.sum(db.batches.c.rejected_kg).label("rejected_kg"))
+            .where(*conditions).group_by(db.batches.c.polymer)).mappings()
+        by_polymer, by_currency = [], {}
+        unpriced = []
+        for row in rows:
+            price = prices.get(row["polymer"])
+            item = {"polymer": row["polymer"], "batches": row["batches"], "total_kg": round(row["total_kg"], 2),
+                    "rejected_kg": round(row["rejected_kg"], 2), "good_kg": round(row["total_kg"] - row["rejected_kg"], 2),
+                    "price_per_kg": price["price_per_kg"] if price else None, "currency": price["currency"] if price else None}
+            if price:
+                item["rejection_cost"] = round(item["rejected_kg"] * price["price_per_kg"], 2)
+                item["good_value"] = round(item["good_kg"] * price["price_per_kg"], 2)
+                bucket = by_currency.setdefault(price["currency"], {"rejection_cost": 0.0, "good_value": 0.0})
+                bucket["rejection_cost"] = round(bucket["rejection_cost"] + item["rejection_cost"], 2)
+                bucket["good_value"] = round(bucket["good_value"] + item["good_value"], 2)
+            else:
+                unpriced.append(row["polymer"])
+            by_polymer.append(item)
+        return {"by_polymer": sorted(by_polymer, key=lambda item: item["polymer"]), "by_currency": by_currency,
+                "unpriced_polymers": sorted(unpriced), "currency_count": len(by_currency),
+                "notice": "Values are your own price book times recorded mass, not invoices or market quotes. Currencies are never summed together."}
+
+    # --- Digital quality passport ---
+    PASSPORT_FIELDS = ("code", "produced_on", "polymer", "purity_pct", "moisture_pct",
+                       "total_kg", "rejected_kg", "quality_verified")
+
+    def passport_snapshot(batch, factory_name):
+        data = {key: batch[key] for key in PASSPORT_FIELDS}
+        data["reject_pct"] = round(batch["rejected_kg"] / batch["total_kg"] * 100, 3)
+        data["factory_name"] = factory_name
+        return data
+
+    def passport_hash(snapshot):
+        return hashlib.sha256(json.dumps(snapshot, sort_keys=True, ensure_ascii=True).encode()).hexdigest()
+
+    @app.get("/api/passports")
+    def list_passports(user=Depends(authenticated), conn=Depends(connection)):
+        rows = conn.execute(select(db.passports.c.token, db.passports.c.batch_id, db.passports.c.content_hash,
+            db.passports.c.issued_at, db.batches.c.code, db.batches.c.polymer, db.batches.c.produced_on)
+            .join(db.batches, db.batches.c.id == db.passports.c.batch_id)
+            .where(db.passports.c.factory_id == user["factory_id"]).order_by(db.passports.c.issued_at.desc()).limit(100)).mappings()
+        return [dict(row) for row in rows]
+
+    @app.post("/api/batches/{batch_id}/passport", status_code=201)
+    def issue_passport(batch_id: str, user=Depends(authenticated), conn=Depends(connection)):
+        batch = conn.execute(select(db.batches).where(db.batches.c.id == batch_id, db.batches.c.factory_id == user["factory_id"])).mappings().first()
+        if batch is None:
+            raise HTTPException(404, "Batch not found")
+        if not batch["quality_verified"]:
+            raise HTTPException(409, "Only quality-verified batches can receive a passport")
+        existing = conn.execute(select(db.passports.c.token).where(db.passports.c.batch_id == batch_id)).scalar_one_or_none()
+        if existing:
+            return {"token": existing, "already_issued": True}
+        factory_name = conn.execute(select(db.factories.c.name).where(db.factories.c.id == user["factory_id"])).scalar_one()
+        snapshot = passport_snapshot(batch, factory_name)
+        token = secrets.token_urlsafe(32)
+        conn.execute(insert(db.passports).values(token=token, factory_id=user["factory_id"], batch_id=batch_id,
+            content_hash=passport_hash(snapshot), snapshot=snapshot, issued_by=user["id"], issued_at=time.time()))
+        return {"token": token, "content_hash": passport_hash(snapshot), "snapshot": snapshot, "already_issued": False}
+
+    @app.get("/public/passports/{token}")
+    def public_passport(token: str):
+        with app.state.engine.connect() as conn:
+            row = conn.execute(select(db.passports).where(db.passports.c.token == token)).mappings().first()
+        if row is None:
+            raise HTTPException(404, "Passport not found")
+        snapshot = row["snapshot"]
+        intact = secrets.compare_digest(passport_hash(snapshot), row["content_hash"])
+        return {"passport": snapshot, "content_hash": row["content_hash"], "issued_at": row["issued_at"],
+                "intact": intact, "status": "valid" if intact else "tampered"}
+
+    # --- Onboarding and data readiness scorecard ---
+    @app.get("/api/readiness")
+    def readiness(user=Depends(authenticated), conn=Depends(connection)):
+        factory = user["factory_id"]
+        machines = conn.execute(select(func.count()).select_from(db.machines).where(db.machines.c.factory_id == factory)).scalar_one()
+        batches = conn.execute(select(func.count()).select_from(db.batches).where(db.batches.c.factory_id == factory)).scalar_one()
+        verified = conn.execute(select(func.count()).select_from(db.batches).where(db.batches.c.factory_id == factory,
+            db.batches.c.quality_verified.is_(True))).scalar_one()
+        prices = conn.execute(select(func.count()).select_from(db.polymer_prices).where(db.polymer_prices.c.factory_id == factory)).scalar_one()
+        downtime = conn.execute(select(func.count()).select_from(db.downtime_events).where(db.downtime_events.c.factory_id == factory)).scalar_one()
+        passports = conn.execute(select(func.count()).select_from(db.passports).where(db.passports.c.factory_id == factory)).scalar_one()
+        items = [
+            {"key": "machine", "label": "At least one machine with verified limits", "done": machines > 0, "detail": f"{machines} registered"},
+            {"key": "batches", "label": "Production batches recorded", "done": batches > 0, "detail": f"{batches} batches"},
+            {"key": "baseline", "label": "Baseline batches for comparison", "done": conn.execute(select(func.count()).select_from(db.batches).where(
+                db.batches.c.factory_id == factory, db.batches.c.phase == "baseline")).scalar_one() > 0, "detail": "baseline phase"},
+            {"key": "verified", "label": "Eight quality-verified batches", "done": verified >= 8, "detail": f"{verified}/8"},
+            {"key": "prices", "label": "Price book for rejection cost", "done": prices > 0, "detail": f"{prices} polymers priced"},
+            {"key": "downtime", "label": "Downtime events logged", "done": downtime > 0, "detail": f"{downtime} events"},
+            {"key": "passport", "label": "First quality passport issued", "done": passports > 0, "detail": f"{passports} passports"},
+        ]
+        score = round(sum(1 for item in items if item["done"]) / len(items) * 100)
+        return {"items": items, "score_pct": score, "stage": "pilot-ready" if score == 100 else "in-setup"}
 
     @app.get("/api/recommendations")
     def list_recommendations(user=Depends(authenticated), conn=Depends(connection)):

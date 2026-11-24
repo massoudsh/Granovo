@@ -93,6 +93,14 @@ python tests/run_postgres.py --bin-dir <postgres-bin-directory>
 | `GET/POST /api/recommendations` | ۵۰ پیشنهاد اخیر یا محاسبه‌ی پیشنهاد جدید |
 | `GET /api/feedback` | تعداد داده‌های verified/pending، مدل‌ران‌های audit‌شده و آمادگی جمع‌آوری برای retraining |
 | `POST /api/recommendations/{id}/approve` | تأیید صریح؛ بدون اعمال تنظیمات روی دستگاه |
+| `POST/GET /api/downtime` | ثبت و فهرست توقف/نگهداشت/انحراف کیفیت؛ فیلتر machine_id/start/end |
+| `GET /api/availability` | دسترس‌پذیری تقویمی و MTBF در بازه‌ی ۱ تا ۳۶۵ روز؛ نه OEE |
+| `PUT/GET /api/prices` | کتاب قیمت هر پلیمر با ارز؛ upsert یکتا per polymer |
+| `GET /api/value-report` | هزینه‌ی ضایعات و ارزش تولید سالم؛ ارزها همیشه جدا |
+| `POST /api/batches/{id}/passport` | صدور گذرنامه برای بچ تأییدشده؛ idempotent |
+| `GET /api/passports` | گذرنامه‌های کارخانه |
+| `GET /public/passports/{token}` | صفحه‌ی عمومی بدون نشست؛ هش را دوباره محاسبه و tamper را گزارش می‌کند |
+| `GET /api/readiness` | امتیاز هفت‌مرحله‌ای آمادگی داده برای پایلوت |
 | `GET /health` | سلامت پردازش؛ تضمین سلامت دیتابیس نیست |
 | `GET /ready` | بررسی اتصال و تمام جدول‌های schema؛ وضعیت ready یا پاسخ عمومی ۵۰۳ در صورت نقص |
 
@@ -103,6 +111,16 @@ machine_id,polymer,purity_pct,moisture_pct,code,produced_on,phase,temperature_c,
 ```
 
 تاریخ `YYYY-MM-DD`، مرحله `baseline` یا `pilot` و پلیمر یکی از PE/PP/PET/PS/PVC/ABS است. داده‌ی واردشده خودکار تأیید کیفیت نمی‌شود.
+
+## قابلیت‌های افزوده‌شده بر پایه‌ی تحلیل رقبا
+
+تحلیل کامل ۵ رقیب بین‌المللی و ۵ رقیب ایرانی و نقشه‌ی قابلیت‌های اقتباس‌شده در `outputs/granovo-competitor-analysis.md` است. پنج قابلیت افزوده‌شده:
+
+1. **نگهداشت پیشگیرانه:** `downtime_events` و `/api/availability`؛ دسترس‌پذیری تقویمی و MTBF، صراحتاً نه OEE.
+2. **کتاب قیمت و هزینه‌ی ضایعات:** `polymer_prices` و `/api/value-report`؛ ارزها هرگز جمع نمی‌شوند.
+3. **گذرنامه‌ی کیفیت:** جدول `passports` با snapshot و SHA-256؛ صفحه‌ی عمومی وجود hash را بررسی می‌کند و هویت کارخانه/اپراتور منتشر نمی‌شود. گواهی قانونی یا آزمایشگاهی نیست.
+4. **امتیاز آمادگی راه‌اندازی:** `/api/readiness` با هفت آیتم؛ فقط کامل‌بودن داده را می‌سنجد.
+5. **اطمینان و بازه‌ی پیشنهاد:** `predict()` اکنون `confidence` و `expected_range` هم برمی‌گرداند؛ همچنان gate داده و تأیید اپراتور لازم است.
 
 ## گیت‌های انتشار
 

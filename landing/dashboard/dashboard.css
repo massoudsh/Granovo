@@ -70,3 +70,8 @@ td small { display: block; color: var(--ink-soft); font-size: .75rem; }
   .header-inner { gap: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn { transition: none; } }
+
+.score-badge { font-size: 1.4rem; font-variant-numeric: tabular-nums; color: var(--teal-dark); }
+.check-list li.pending { color: var(--ink-soft); }
+.check-list li.pending::before { content: "○"; color: var(--ink-soft); }
+.recommendation-card .muted { margin-top: 6px; }

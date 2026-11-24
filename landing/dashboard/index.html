@@ -41,7 +41,7 @@
         <span class="phase-tag">نسخه‌ی آزمایشی پایلوت</span>
       </section>
       <nav class="workspace-nav" aria-label="بخش‌های داشبورد">
-        <a href="#metrics">عملکرد تولید</a><a href="#batch-panel">ثبت بچ</a><a href="#history-panel">تاریخچه</a><a href="#recommendation-panel">پیشنهاد تنظیمات</a><a href="#machine-panel">دستگاه‌ها</a>
+        <a href="#readiness-panel">آمادگی راه‌اندازی</a><a href="#metrics">عملکرد تولید</a><a href="#batch-panel">ثبت بچ</a><a href="#history-panel">تاریخچه</a><a href="#recommendation-panel">پیشنهاد تنظیمات</a><a href="#value-panel">ارزش اقتصادی</a><a href="#availability-panel">خرابی و دسترس‌پذیری</a><a href="#passport-panel">گذرنامه کیفیت</a><a href="#machine-panel">دستگاه‌ها</a>
       </nav>
       <section id="metrics" class="panel" aria-labelledby="metrics-title">
         <div class="section-heading"><div><p class="section-eyebrow">معیار موفقیت</p><h2 id="metrics-title">نرخ رد کالا، با وزن واقعی تولید</h2></div><span class="target-tag">هدف پایلوت: کمتر از ۵٪</span></div>
@@ -115,6 +115,59 @@
         <p class="disclaimer">«تأیید کیفیت» یعنی نتیجه را در کارخانه بررسی کرده‌اید. فقط بچ‌های تأییدشده با نرخ رد کمتر از ۵٪ می‌توانند داده‌ی مدل آزمایشی باشند.</p>
         <div class="table-scroll"><table><caption class="visually-hidden">بچ‌های تولید مطابق فیلتر عملکرد</caption><thead><tr><th scope="col">بچ / تاریخ</th><th scope="col">دستگاه / پلیمر</th><th scope="col">مرحله</th><th scope="col">تولید / مردود (kg)</th><th scope="col">نرخ رد</th><th scope="col">کیفیت</th></tr></thead><tbody id="batch-rows"></tbody></table></div>
         <p id="history-empty" class="empty-state">هنوز بچی ثبت نشده است.</p>
+      </section>
+
+      <section id="readiness-panel" class="panel" aria-labelledby="readiness-title">
+        <div class="section-heading"><div><p class="section-eyebrow">راه‌اندازی کارخانه</p><h2 id="readiness-title">آمادگی برای پایلوت</h2></div><strong id="readiness-score" class="score-badge">—</strong></div>
+        <ul id="readiness-list" class="check-list"></ul>
+        <p class="disclaimer">این چک‌لیست فقط کامل‌بودن داده‌ی سامانه را نشان می‌دهد، نه تأیید کیفیت محصول یا موفقیت پایلوت.</p>
+      </section>
+
+      <div class="work-grid">
+        <section id="value-panel" class="panel" aria-labelledby="value-title">
+          <p class="section-eyebrow">به زبان پول</p><h2 id="value-title">ارزش اقتصادی ضایعات</h2>
+          <p class="disclaimer warning">محاسبه بر پایه‌ی «کتاب قیمت خودتان» × وزن ثبت‌شده است؛ فاکتور، نرخ بازار یا تسویه‌حساب نیست. ارزها هرگز با هم جمع نمی‌شوند.</p>
+          <form id="price-form" class="filter-grid">
+            <label>پلیمر<select name="polymer"><option>PP</option><option>PE</option><option>PET</option><option>PS</option><option>PVC</option><option>ABS</option></select></label>
+            <label>قیمت هر کیلو<input name="price_per_kg" type="number" min="0.0001" max="1000000000" step="any" required></label>
+            <label>ارز<select name="currency"><option value="IRR">ریال</option><option value="USD">دلار</option><option value="EUR">یورو</option></select></label>
+            <button class="btn btn-ghost" type="submit">ثبت قیمت</button>
+          </form>
+          <div class="metrics-grid">
+            <article class="metric-card"><h3>هزینه‌ی ضایعات</h3><strong id="rejection-cost">—</strong><p>مقدار مردود × قیمت</p></article>
+          </div>
+          <div class="table-scroll"><table><caption class="visually-hidden">ارزش ضایعات و تولید سالم به تفکیک پلیمر</caption><thead><tr><th scope="col">پلیمر</th><th scope="col">تولید (kg)</th><th scope="col">مردود (kg)</th><th scope="col">قیمت/kg</th><th scope="col">هزینه‌ی ضایعات</th><th scope="col">ارزش سالم</th></tr></thead><tbody id="value-rows"></tbody></table></div>
+          <p id="value-empty" class="empty-state">برای محاسبه، قیمت پلیمرها را در کتاب قیمت ثبت کنید.</p>
+        </section>
+
+        <div class="side-stack">
+          <section id="availability-panel" class="panel" aria-labelledby="availability-title">
+            <p class="section-eyebrow">نگهداشت پیشگیرانه</p><h2 id="availability-title">خرابی و دسترس‌پذیری</h2>
+            <p class="disclaimer warning">دسترس‌پذیری در بازه‌ی تقویمی است، نه OEE؛ فرض می‌کند دستگاه می‌توانست تمام بازه کار کند و ساعت تولید برنامه‌ریزی‌شده را مدل نمی‌کند.</p>
+            <form id="downtime-form" class="fields two-columns">
+              <label>دستگاه<select class="machine-select" name="machine_id" required></select></label>
+              <label>نوع<select name="kind"><option value="downtime">توقف</option><option value="maintenance">نگهداشت</option><option value="quality_drift">انحراف کیفیت</option></select></label>
+              <label>تاریخ<input name="started_on" type="date" required></label>
+              <label>مدت (دقیقه)<input name="minutes" type="number" min="1" max="20160" step="any" required></label>
+              <label class="full-width">یادداشت<input name="note" maxlength="500"></label>
+              <button class="btn btn-ghost" type="submit">ثبت توقف</button>
+            </form>
+            <div class="metrics-grid"><article class="metric-card"><h3>دسترس‌پذیری ۳۰ روز</h3><strong id="availability-value">—</strong><p id="availability-detail">داده‌ای ثبت نشده</p></article></div>
+            <div class="table-scroll"><table><caption class="visually-hidden">دسترس‌پذیری و MTBF هر دستگاه</caption><thead><tr><th scope="col">دستگاه</th><th scope="col">دسترس‌پذیری</th><th scope="col">توقف (دقیقه)</th><th scope="col">رویداد</th><th scope="col">MTBF (دقیقه)</th></tr></thead><tbody id="availability-rows"></tbody></table></div>
+            <p id="downtime-empty" class="empty-state">هنوز توقفی ثبت نشده است.</p>
+          </section>
+        </div>
+      </div>
+
+      <section id="passport-panel" class="panel" aria-labelledby="passport-title">
+        <div class="section-heading"><div><p class="section-eyebrow">قابل ارائه به خریدار</p><h2 id="passport-title">گذرنامه‌ی کیفیت گرانول</h2></div><span id="passport-count" class="muted"></span></div>
+        <p class="disclaimer warning">گذرنامه فقط برای بچ‌های تأییدکیفی‌شده صادر می‌شود و عکس فوری داده را با هش SHA-256 مهر می‌کند. این گواهی قانونی، آزمایشگاهی یا محتوای بازیافتی نیست و هویت کارخانه به‌صورت عمومی منتشر نمی‌شود.</p>
+        <form id="passport-form" class="filter-grid">
+          <label>بچ تأییدشده<select name="batch_id" id="passport-batch" required></select></label>
+          <button class="btn btn-primary" type="submit">صدور گذرنامه</button>
+        </form>
+        <div class="table-scroll"><table><caption class="visually-hidden">گذرنامه‌های صادرشده و لینک عمومی</caption><thead><tr><th scope="col">بچ</th><th scope="col">پلیمر / تاریخ</th><th scope="col">هش</th><th scope="col">لینک عمومی</th></tr></thead><tbody id="passport-rows"></tbody></table></div>
+        <p id="passport-empty" class="empty-state">هنوز گذرنامه‌ای صادر نشده است؛ ابتدا کیفیت بچ را تأیید کنید.</p>
       </section>
 
       <section id="recommendation-panel" class="panel" aria-labelledby="recommendation-title">

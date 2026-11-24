@@ -3,7 +3,7 @@
 const $ = (id) => document.getElementById(id);
 const state = { csrf: "", mode: "login", machines: [] };
 const format = new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 3 });
-const numericFields = new Set(["temperature_min", "temperature_max", "rpm_max", "pressure_max", "purity_pct", "moisture_pct", "temperature_c", "screw_rpm", "pressure_bar", "total_kg", "rejected_kg"]);
+const numericFields = new Set(["temperature_min", "temperature_max", "rpm_max", "pressure_max", "purity_pct", "moisture_pct", "temperature_c", "screw_rpm", "pressure_bar", "total_kg", "rejected_kg", "minutes", "price_per_kg"]);
 const batchColumns = ["machine_id", "polymer", "purity_pct", "moisture_pct", "code", "produced_on", "phase", "temperature_c", "screw_rpm", "pressure_bar", "total_kg", "rejected_kg"];
 const errors = {
   401: "ایمیل یا رمز عبور نادرست است، یا نشست شما پایان یافته. دوباره وارد شوید.",
@@ -29,6 +29,11 @@ function signedOut() {
   $("batch-rows").replaceChildren();
   $("recommendation-list").replaceChildren();
   $("machine-list").replaceChildren();
+  $("availability-rows").replaceChildren();
+  $("value-rows").replaceChildren();
+  $("passport-rows").replaceChildren();
+  $("readiness-list").replaceChildren();
+  $("passport-batch").replaceChildren();
   for (const id of ["batch-form", "machine-form", "recommendation-form", "csv-form", "filters"]) $(id).reset();
   $("batch-form").elements.produced_on.value = localDate;
   $("factory-title").textContent = "خط تولید شما";
@@ -54,6 +59,7 @@ async function api(path, { method = "GET", data, csv } = {}) {
       else message = "ایمیل، نام دستگاه یا کد بچ تکراری است؛ هیچ داده‌ی جدیدی ذخیره نشد.";
     }
     if (path === "batches/import" && response.status === 422) message += ` ${result.detail || ""}`;
+    if (path.includes("/passport") && response.status === 409) message = "گذرنامه فقط برای بچ تأییدکیفی‌شده صادر می‌شود.";
     throw new Error(message);
   }
   return result;
@@ -150,6 +156,13 @@ function renderRecommendations(rows) {
       element("p", `${format.format(row.temperature_c)} °C · ${format.format(row.screw_rpm)} rpm · ${format.format(row.pressure_bar)} bar`),
       element("p", `${format.format(row.training_count)} نمونه‌ی تاریخی`), element("code", row.model_version));
     const metrics = row.evaluation;
+    if (metrics.confidence) {
+      const range = metrics.expected_range;
+      card.append(element("p", `${confidenceLabels[metrics.confidence] || metrics.confidence} · بازه‌ی نمونه‌های نزدیک: ${[
+        `دما ${format.format(range.temperature_c.min)}–${format.format(range.temperature_c.max)} °C`,
+        `سرعت ${format.format(range.screw_rpm.min)}–${format.format(range.screw_rpm.max)} rpm`,
+        `فشار ${format.format(range.pressure_bar.min)}–${format.format(range.pressure_bar.max)} bar`].join(" · ")}`, "muted"));
+    }
     card.append(element("p", `خطای ارزیابی داخلی دما ${format.format(metrics.holdout_mae.temperature_c)} °C · سرعت ${format.format(metrics.holdout_mae.screw_rpm)} rpm · فشار ${format.format(metrics.holdout_mae.pressure_bar)} bar`, "muted"));
     if (row.approved_at) card.append(element("p", "تأیید اپراتور ثبت شد — بدون اعمال روی دستگاه", "approved"));
     else {
@@ -162,11 +175,90 @@ function renderRecommendations(rows) {
   }));
 }
 
+const confidenceLabels = { high: "اطمینان بالا", medium: "اطمینان متوسط", low: "اطمینان کم" };
+const money = new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 2 });
+const currencyLabels = { IRR: "ریال", USD: "دلار", EUR: "یورو" };
+
+function renderReadiness(data) {
+  $("readiness-score").textContent = `٪${format.format(data.score_pct)}`;
+  $("readiness-list").replaceChildren(...data.items.map((item) => {
+    const li = element("li", `${item.label} — ${item.detail}`);
+    if (!item.done) li.classList.add("pending");
+    return li;
+  }));
+}
+
+function renderValue(report) {
+  const priced = report.by_polymer.filter((item) => item.price_per_kg !== null);
+  $("value-empty").hidden = priced.length > 0;
+  $("value-rows").replaceChildren(...report.by_polymer.map((item) => {
+    const tr = element("tr");
+    tr.append(element("td", item.polymer), element("td", format.format(item.total_kg)),
+      element("td", format.format(item.rejected_kg)),
+      element("td", item.price_per_kg === null ? "بدون قیمت" : money.format(item.price_per_kg)),
+      element("td", item.rejection_cost === undefined ? "—" : `${money.format(item.rejection_cost)} ${currencyLabels[item.currency] || item.currency}`),
+      element("td", item.good_value === undefined ? "—" : `${money.format(item.good_value)} ${currencyLabels[item.currency] || item.currency}`));
+    return tr;
+  }));
+  const parts = Object.entries(report.by_currency).map(([currency, sums]) => `${money.format(sums.rejection_cost)} ${currencyLabels[currency] || currency}`);
+  $("rejection-cost").textContent = parts.length ? parts.join(" · ") : "—";
+}
+
+function renderAvailability(report) {
+  const overall = report.overall;
+  $("availability-value").textContent = overall.availability_pct === null ? "—" : `٪${format.format(overall.availability_pct)}`;
+  $("availability-detail").textContent = overall.machine_count ? `${format.format(overall.machine_count)} دستگاه · ${format.format(overall.downtime_minutes)} دقیقه توقف در ${format.format(report.window_days)} روز` : "دستگاهی ثبت نشده است";
+  $("downtime-empty").hidden = report.machines.some((item) => item.events > 0);
+  $("availability-rows").replaceChildren(...report.machines.map((item) => {
+    const tr = element("tr");
+    tr.append(element("td", machineName(item.machine_id)), element("td", `٪${format.format(item.availability_pct)}`),
+      element("td", format.format(item.downtime_minutes)), element("td", format.format(item.events)),
+      element("td", item.mtbf_minutes === null ? "—" : format.format(item.mtbf_minutes)));
+    return tr;
+  }));
+}
+
+function renderPassports(rows) {
+  $("passport-empty").hidden = rows.length > 0;
+  $("passport-count").textContent = `${format.format(rows.length)} گذرنامه`;
+  $("passport-rows").replaceChildren(...rows.map((row) => {
+    const tr = element("tr");
+    const link = element("a", "مشاهده", "text-button");
+    link.href = `/public/passports/${encodeURIComponent(row.token)}`;
+    link.target = "_blank";
+    link.rel = "noopener";
+    const issue = element("td");
+    issue.append(link);
+    tr.append(element("td", row.code), element("td", `${row.polymer} · ${row.produced_on}`),
+      element("code", row.content_hash.slice(0, 12) + "…"), issue);
+    return tr;
+  }));
+}
+
+function renderPassportChoices(batches) {
+  const verified = batches.filter((batch) => batch.quality_verified);
+  $("passport-batch").replaceChildren(...verified.map((batch) => {
+    const option = element("option", `${batch.code} · ${batch.polymer}`);
+    option.value = batch.id;
+    return option;
+  }));
+}
+
 async function refreshMetrics() {
   const query = filters();
   const [kpis, batches] = await Promise.all([api(`kpis?${query}`), api(`batches?${query}`)]);
   renderKpis(kpis);
   renderBatches(batches);
+  renderPassportChoices(batches.items);
+}
+
+async function refreshSecondary() {
+  const [readiness, value, availability, passports] = await Promise.all([
+    api("readiness"), api("value-report"), api("availability?window_days=30"), api("passports")]);
+  renderReadiness(readiness);
+  renderValue(value);
+  renderAvailability(availability);
+  renderPassports(passports);
 }
 
 async function enterWorkspace() {
@@ -178,6 +270,7 @@ async function enterWorkspace() {
   $("logout").hidden = false;
   renderMachines(await api("machines"));
   await refreshMetrics();
+  await refreshSecondary();
   renderRecommendations(await api("recommendations"));
   status(state.machines.length ? "فضای کارخانه آماده است." : "برای شروع، دستگاه و محدوده‌ی مجاز آن را ثبت کنید.");
 }
@@ -274,6 +367,26 @@ $("logout").addEventListener("click", async () => {
   try { await api("logout", { method: "POST" }); signedOut(); status("از حساب خارج شدید."); }
   catch (error) { status(error.message, true); }
 });
+handle("downtime-form", async (form) => {
+  await api("downtime", { method: "POST", data: values(form) });
+  form.reset();
+  form.elements.started_on.value = localDate;
+  await refreshSecondary();
+  status("توقف ثبت شد و در دسترس‌پذیری محاسبه می‌شود.");
+});
+handle("price-form", async (form) => {
+  await api("prices", { method: "PUT", data: values(form) });
+  await refreshSecondary();
+  status("قیمت پلیمر در کتاب قیمت ذخیره شد.");
+});
+handle("passport-form", async (form) => {
+  const batchId = form.elements.batch_id.value;
+  if (!batchId) throw new Error("ابتدا کیفیت یک بچ را تأیید کنید.");
+  const result = await api(`batches/${batchId}/passport`, { method: "POST" });
+  await refreshSecondary();
+  status(result.already_issued ? "این بچ از قبل گذرنامه دارد؛ همان لینک نمایش داده شد." : "گذرنامه صادر شد؛ لینک عمومی آماده است.");
+});
+
 $("csv-template").addEventListener("click", () => {
   const url = URL.createObjectURL(new Blob(["\uFEFF" + batchColumns.join(",") + "\n"], { type: "text/csv;charset=utf-8" }));
   const link = element("a");
@@ -287,6 +400,8 @@ const today = new Date();
 const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 $("batch-form").elements.produced_on.value = localDate;
 $("batch-form").elements.produced_on.max = localDate;
+$("downtime-form").elements.started_on.value = localDate;
+$("downtime-form").elements.started_on.max = localDate;
 enterWorkspace().catch((error) => {
   signedOut();
   status(error.message.includes("نشست") ? "برای شروع وارد شوید یا کارخانه‌ی جدید ثبت کنید." : "سرویس در دسترس نیست؛ داشبورد به API هم‌مبدأ نیاز دارد.", !error.message.includes("نشست"));

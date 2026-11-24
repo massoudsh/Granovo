@@ -116,6 +116,20 @@ docker build --build-arg PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple -
 
 The build also sets `PIP_RETRIES=10` and `PIP_TIMEOUT=120` and uses `--prefer-binary`, so a flaky connection retries instead of failing. All pinned packages have ARM64 wheels, so no compiler is needed on Apple Silicon or ARM servers.
 
+## Competitive parity features
+
+Five capabilities adopted from leading international (EREMA PredictOn, TOMRA, Cirplus, Recyda,
+EverestLabs) and Iranian (Bazmand, GAIN, Pakdoon) products — see
+[`outputs/granovo-competitor-analysis.md`](outputs/granovo-competitor-analysis.md):
+
+1. **Predictive maintenance** — downtime events plus calendar-window availability and MTBF (not OEE).
+2. **Price book and rejection cost** — your own prices × recorded mass, always reported per currency.
+3. **Quality passport** — a public, token-addressed page with a SHA-256 content hash that reports tampering.
+4. **Onboarding readiness scorecard** — seven checks showing what a pilot still needs.
+5. **Recommendation confidence** — every estimate carries a confidence level and neighbour range.
+
+Each is deliberately scoped: no PLC control, no lab certificate, no payment settlement.
+
 ## Architecture
 
 The static landing page and RTL operator dashboard are served by the FastAPI application. The API validates input with Pydantic, stores factory-scoped operational records with SQLAlchemy, and exposes liveness (`/health`) and schema/database readiness (`/ready`). The recommendation service uses only quality-verified historical batches for the same factory, machine, and polymer; it is not an industrial model and never controls equipment.

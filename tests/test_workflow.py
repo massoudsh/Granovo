@@ -300,3 +300,143 @@ def test_target_boundary_without_rounding_error(setup, rejected, expected):
     machine_id = machine(client)
     add(client, batch(machine_id, phase="pilot", rejected_kg=rejected))
     assert client.get("/api/kpis").json()["pilot_below_target"] is expected
+
+
+def test_downtime_and_calendar_availability(setup):
+    client, _, _ = setup
+    account(client)
+    machine_id = machine(client)
+    assert client.post("/api/downtime", json={"machine_id": machine_id, "started_on": date.today().isoformat(), "minutes": 120}).status_code == 201
+    assert client.post("/api/downtime", json={"machine_id": machine_id, "started_on": date.today().isoformat(), "minutes": 60, "kind": "maintenance"}).status_code == 201
+    assert client.post("/api/downtime", json={"machine_id": machine_id, "started_on": date.today().isoformat(), "minutes": 0}).status_code == 422
+    assert client.post("/api/downtime", json={"machine_id": machine_id, "started_on": (date.today() + timedelta(days=1)).isoformat(), "minutes": 30}).status_code == 422
+    assert client.post("/api/downtime", json={"machine_id": "unknown", "started_on": date.today().isoformat(), "minutes": 30}).status_code == 404
+    listing = client.get("/api/downtime").json()["items"]
+    assert len(listing) == 2
+    report = client.get("/api/availability?window_days=30").json()
+    entry = report["machines"][0]
+    assert entry["events"] == 2 and entry["downtime_minutes"] == 180
+    assert entry["minutes_by_kind"] == {"downtime": 120, "maintenance": 60}
+    window = 30 * 24 * 60
+    assert entry["availability_pct"] == round((window - 180) / window * 100, 3)
+    assert entry["mtbf_minutes"] == round((window - 180) / 2, 1)
+    assert client.get("/api/availability?window_days=0").status_code == 422
+    assert client.get("/api/availability?window_days=400").status_code == 422
+
+
+def test_availability_window_excludes_old_events_and_respects_isolation(setup):
+    client, app, _ = setup
+    account(client)
+    machine_id = machine(client)
+    client.post("/api/downtime", json={"machine_id": machine_id, "started_on": (date.today() - timedelta(days=60)).isoformat(), "minutes": 600})
+    report = client.get("/api/availability?window_days=7").json()
+    assert report["machines"][0]["downtime_minutes"] == 0
+    assert report["machines"][0]["availability_pct"] == 100
+    assert report["machines"][0]["mtbf_minutes"] is None
+    with TestClient(app, base_url="https://testserver") as other:
+        account(other, "other@example.com")
+        assert other.get("/api/downtime").json()["items"] == []
+        assert other.get("/api/availability").json()["machines"] == []
+        assert other.post("/api/downtime", json={"machine_id": machine_id, "started_on": date.today().isoformat(), "minutes": 10}).status_code == 404
+
+
+def test_price_book_upsert_and_currency_safe_value_report(setup):
+    client, _, _ = setup
+    account(client)
+    machine_id = machine(client)
+    add(client, batch(machine_id, "pp-1", polymer="PP", total_kg=100, rejected_kg=20))
+    add(client, batch(machine_id, "pet-1", polymer="PET", total_kg=50, rejected_kg=5))
+    empty = client.get("/api/value-report").json()
+    assert empty["unpriced_polymers"] == ["PET", "PP"]
+    assert empty["by_currency"] == {}
+
+    first = client.put("/api/prices", json={"polymer": "PP", "price_per_kg": 1000, "currency": "IRR"}).json()
+    second = client.put("/api/prices", json={"polymer": "PP", "price_per_kg": 2000, "currency": "IRR"}).json()
+    assert first["id"] == second["id"]
+    assert len(client.get("/api/prices").json()) == 1
+    client.put("/api/prices", json={"polymer": "PET", "price_per_kg": 0.5, "currency": "USD"})
+
+    report = client.get("/api/value-report").json()
+    pp = next(item for item in report["by_polymer"] if item["polymer"] == "PP")
+    assert pp["rejection_cost"] == 40000 and pp["good_value"] == 160000
+    pet = next(item for item in report["by_polymer"] if item["polymer"] == "PET")
+    assert pet["rejection_cost"] == 2.5 and pet["currency"] == "USD"
+    assert report["unpriced_polymers"] == []
+    assert report["currency_count"] == 2
+    assert report["by_currency"]["IRR"]["rejection_cost"] == 40000
+    assert report["by_currency"]["USD"]["rejection_cost"] == 2.5
+
+
+def test_quality_passport_requires_verification_and_detects_tampering(setup):
+    client, _, engine = setup
+    account(client)
+    machine_id = machine(client)
+    record = add(client, batch(machine_id))
+    assert client.post(f'/api/batches/{record["id"]}/passport').status_code == 409
+    client.patch(f'/api/batches/{record["id"]}/quality', json={"quality_verified": True})
+    issued = client.post(f'/api/batches/{record["id"]}/passport')
+    assert issued.status_code == 201, issued.text
+    token = issued.json()["token"]
+    again = client.post(f'/api/batches/{record["id"]}/passport').json()
+    assert again["already_issued"] is True and again["token"] == token
+
+    public = client.get(f"/public/passports/{token}")
+    assert public.status_code == 200
+    body = public.json()
+    assert body["intact"] is True and body["status"] == "valid"
+    assert body["passport"]["code"] == "B1" and body["passport"]["polymer"] == "PP"
+    assert body["passport"]["quality_verified"] is True
+    assert body["passport"]["reject_pct"] == 20
+    assert "factory_id" not in body["passport"] and "operator_id" not in body["passport"]
+    assert client.get(f"/public/passports/{token}").headers["Access-Control-Allow-Origin"] == "*"
+
+    with engine.begin() as conn:
+        conn.execute(db.passports.update().values(snapshot={**body["passport"], "rejected_kg": 1}))
+    tampered = client.get(f"/public/passports/{token}").json()
+    assert tampered["intact"] is False and tampered["status"] == "tampered"
+    assert client.get("/public/passports/does-not-exist").status_code == 404
+    assert len(client.get("/api/passports").json()) == 1
+
+
+def test_passport_is_factory_scoped(setup):
+    client, app, _ = setup
+    account(client)
+    machine_id = machine(client)
+    record = add(client, batch(machine_id))
+    client.patch(f'/api/batches/{record["id"]}/quality', json={"quality_verified": True})
+    token = client.post(f'/api/batches/{record["id"]}/passport').json()["token"]
+    with TestClient(app, base_url="https://testserver") as other:
+        account(other, "other@example.com")
+        assert other.post(f'/api/batches/{record["id"]}/passport').status_code == 404
+        assert other.get("/api/passports").json() == []
+        assert other.get(f"/public/passports/{token}").status_code == 200
+
+
+def test_readiness_scorecard_tracks_onboarding_progress(setup):
+    client, _, _ = setup
+    account(client)
+    starts_empty = client.get("/api/readiness").json()
+    assert starts_empty["score_pct"] == 0 and starts_empty["stage"] == "in-setup"
+    assert len(starts_empty["items"]) == 7
+    machine_id = machine(client)
+    after_machine = client.get("/api/readiness").json()
+    assert after_machine["score_pct"] > 0
+    done = {item["key"]: item["done"] for item in after_machine["items"]}
+    assert done["machine"] is True and done["batches"] is False
+    add(client, batch(machine_id))
+    done = {item["key"]: item["done"] for item in client.get("/api/readiness").json()["items"]}
+    assert done["batches"] is True and done["baseline"] is True
+
+
+def test_new_endpoints_reject_cross_origin_and_csrf(setup):
+    client, _, _ = setup
+    account(client)
+    machine_id = machine(client)
+    payload = {"machine_id": machine_id, "started_on": date.today().isoformat(), "minutes": 30}
+    good = client.headers["X-CSRF-Token"]
+    assert client.post("/api/downtime", json=payload, headers={"Origin": "https://evil.example"}).status_code == 403
+    client.headers["X-CSRF-Token"] = "wrong"
+    assert client.post("/api/downtime", json=payload).status_code == 403
+    assert client.put("/api/prices", json={"polymer": "PP", "price_per_kg": 1}).status_code == 403
+    client.headers["X-CSRF-Token"] = good
+    assert client.post("/api/downtime", json=payload).status_code == 201

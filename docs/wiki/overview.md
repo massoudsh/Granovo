@@ -30,9 +30,10 @@ Optimization Platform).
 - [[concepts/production-workflow]] — API احراز هویت‌شده و جداسازی کارخانه، schema PostgreSQL/SQLite، ثبت دستگاه/بچ و CSV، داشبورد اپراتور و KPI وزن‌دار/روند روزانه
 - [[entities/feedback-loop]] — ثبت تأیید کیفیت، model run audit، fingerprint/MAE و gate داده برای تخمین بعدی
 - [[entities/extruder-parameter-predictor]] — پیشنهاد آزمایشی همسایه‌ی تاریخی با gate داده، ارزیابی داخلی و تأیید اپراتور؛ بدون کنترل ماشین
+- [[concepts/competitive-parity]] — نگهداشت پیشگیرانه، هزینه‌ی ضایعات، گذرنامه‌ی کیفیت، امتیاز آمادگی و اطمینان پیشنهاد
 - hardening فنی شامل CI، CodeQL، gitleaks، SBOM، Dependabot، README، معماری، threat model، لاگ ساختاری و OpenTelemetry API در ریشه‌ی repo
 
-۱۷ تست backend محلی و ۸ تست Node، به‌علاوه ۳۲ تست backend روی PostgreSQL 17 و SQLite و backup/restore داده‌ی آزمایشی پاس شده‌اند. تست بصری مرورگر، استقرار و پایلوت صنعتی هنوز انجام نشده‌اند؛ issueهای باز صنعتی/بازارگاه همچنان نیازمند داده، شریک یا سرویس بیرونی‌اند.
+۳۴ تست backend محلی و ۱۳ تست Node، به‌علاوه ۵۶ تست backend روی PostgreSQL 17 و SQLite و backup/restore داده‌ی آزمایشی پاس شده‌اند. تست بصری مرورگر، استقرار و پایلوت صنعتی هنوز انجام نشده‌اند؛ issueهای باز صنعتی/بازارگاه همچنان نیازمند داده، شریک یا سرویس بیرونی‌اند.
 
 > این ویکی طبق «Vault Recipe» نگه‌داری می‌شود (نگاه کنید `schema.md` و `CLAUDE.md` در ریشه‌ی
 > ریپو). هر تغییر معنایی در کد باید همین‌جا هم منعکس شود.

@@ -11,3 +11,5 @@
 ## [2026-10-19] update | CI/security hardening، معماری و threat model، لاگ ساختاری/OpenTelemetry، پروفایل دستگاه‌های چندنوعی و audit حلقه‌ی بازخورد با model_runs و endpoint feedback اضافه شد؛ تست PostgreSQL/SQLite و بازیابی backup دوباره پاس شد.
 
 ## [2026-11-14] update | بسته‌بندی Docker (Dockerfile چندمرحله‌ای غیرroot، compose با PostgreSQL، entrypoint با retry، .dockerignore)، جداسازی requirements runtime/dev، متغیرهای محیطی سرور و تست packaging اضافه شد؛ build ایمیج در این محیط اجرا نشد.
+
+## [2026-11-24] update | تحلیل ۵ رقیب بین‌المللی و ۵ رقیب ایرانی در outputs/granovo-competitor-analysis.md؛ پنج قابلیت افزوده شد: توقف/دسترس‌پذیری، کتاب قیمت و هزینه‌ی ضایعات، گذرنامه‌ی کیفیت با هش، امتیاز آمادگی، و اطمینان/بازه‌ی پیشنهاد. ۳۴ تست backend، ۵۶ تست SQLite+PostgreSQL و ۱۳ تست dashboard پاس شد.

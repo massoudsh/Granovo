@@ -12,8 +12,8 @@ class Element {
     this.events = {};
     this.hidden = false;
     this.value = "";
-    this.elements = Object.fromEntries(["password", "factory_name", "produced_on", "code"].map((key) => [key, {}]));
-    this.classList = { toggle() {} };
+    this.elements = Object.fromEntries(["password", "factory_name", "produced_on", "code", "started_on", "batch_id", "price_per_kg"].map((key) => [key, {}]));
+    this.classList = { toggle() {}, add() {}, contains() { return false; } };
   }
   addEventListener(name, callback) { this.events[name] = callback; }
   replaceChildren(...nodes) { this.children = nodes; }
@@ -161,4 +161,67 @@ test("form serialization converts only numeric fields", async () => {
   assert.equal(result.total_kg, 100.5);
   assert.equal(result.purity_pct, 95);
   assert.equal(result.machine_id, "123");
+});
+
+test("readiness scorecard shows progress and pending items", async () => {
+  const { nodes, run } = await dashboard();
+  run(`renderReadiness({score_pct:42,stage:"in-setup",items:[{key:"machine",label:"Machine",detail:"1 registered",done:true},{key:"batches",label:"Batches",detail:"0 batches",done:false}]})`);
+  assert.equal(nodes.get("readiness-score").textContent, "٪۴۲");
+  const items = nodes.get("readiness-list").children;
+  assert.equal(items.length, 2);
+  assert.match(items[0].textContent, /Machine/);
+  assert.ok(items[1].textContent.includes("Batches"));
+});
+
+test("value report never mixes currencies into one total", async () => {
+  const { nodes, run } = await dashboard();
+  run(`renderValue({by_polymer:[
+    {polymer:"PP",total_kg:100,rejected_kg:20,price_per_kg:1000,currency:"IRR",rejection_cost:20000,good_value:80000},
+    {polymer:"PET",total_kg:50,rejected_kg:5,price_per_kg:0.5,currency:"USD",rejection_cost:2.5,good_value:22.5},
+    {polymer:"PS",total_kg:10,rejected_kg:1,price_per_kg:null,currency:null}
+  ],by_currency:{IRR:{rejection_cost:20000,good_value:80000},USD:{rejection_cost:2.5,good_value:22.5}}})`);
+  const total = nodes.get("rejection-cost").textContent;
+  assert.match(total, /ریال/);
+  assert.match(total, /دلار/);
+  const cells = nodes.get("value-rows").children[2].children;
+  assert.equal(cells[3].textContent, "بدون قیمت");
+  assert.equal(cells[4].textContent, "—");
+  assert.equal(nodes.get("value-empty").hidden, true);
+});
+
+test("availability table renders MTBF and empty state", async () => {
+  const { nodes, run } = await dashboard();
+  run(`state.machines=[{id:"m1",name:"Extruder 1"}]`);
+  run(`renderAvailability({window_days:30,overall:{machine_count:1,availability_pct:99.5,downtime_minutes:180},machines:[{machine_id:"m1",availability_pct:99.5,downtime_minutes:180,events:2,mtbf_minutes:12}]})`);
+  assert.match(nodes.get("availability-value").textContent, /۹۹٫۵|99/);
+  const cells = nodes.get("availability-rows").children[0].children;
+  assert.equal(cells[0].textContent, "Extruder 1");
+  assert.equal(cells[3].textContent, "۲");
+  assert.equal(nodes.get("downtime-empty").hidden, true);
+  run(`renderAvailability({window_days:30,overall:{machine_count:0,availability_pct:null,downtime_minutes:0},machines:[]})`);
+  assert.equal(nodes.get("downtime-empty").hidden, false);
+  assert.equal(nodes.get("availability-value").textContent, "—");
+});
+
+test("passport list links to the public page and only verified batches are selectable", async () => {
+  const { nodes, run } = await dashboard();
+  run(`renderPassports([{token:"abc123",code:"B1",polymer:"PP",produced_on:"2025-01-01",content_hash:"0123456789abcdef"}])`);
+  const row = nodes.get("passport-rows").children[0];
+  assert.equal(row.children[0].textContent, "B1");
+  const link = row.children[3].children[0];
+  assert.equal(link.href, "/public/passports/abc123");
+  assert.equal(link.rel, "noopener");
+  assert.equal(nodes.get("passport-empty").hidden, true);
+  run(`renderPassportChoices([{id:"b1",code:"good",polymer:"PP",quality_verified:true},{id:"b2",code:"pending",polymer:"PE",quality_verified:false}])`);
+  const options = nodes.get("passport-batch").children;
+  assert.equal(options.length, 1);
+  assert.equal(options[0].value, "b1");
+});
+
+test("recommendation card shows confidence and expected ranges", async () => {
+  const { nodes, run } = await dashboard();
+  run(`renderRecommendations([{id:"r",machine_id:"m",polymer:"PP",purity_pct:95,moisture_pct:1,temperature_c:200,screw_rpm:150,pressure_bar:80,training_count:24,model_version:"knn3-v1-x",evaluation:{holdout_mae:{temperature_c:2,screw_rpm:2,pressure_bar:1},confidence:"high",expected_range:{temperature_c:{min:198,max:202},screw_rpm:{min:148,max:152},pressure_bar:{min:79,max:81}}}}])`);
+  const text = nodes.get("recommendation-list").children[0].children.map((node) => node.textContent).join(" ");
+  assert.match(text, /اطمینان بالا/);
+  assert.match(text, /۱۹۸|198/);
 });

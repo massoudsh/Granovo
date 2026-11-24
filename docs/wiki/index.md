@@ -13,7 +13,8 @@
 - [[entities/marketplace]] — بازارگاه B2B فروش گرانول بازیافتی
 - [[entities/landing-page]] — لندینگ‌پیج استاتیک معرفی محصول (`landing/`)
 
-## Concepts (۴ صفحه)
+## Concepts (۵ صفحه)
+- [[concepts/competitive-parity]] — پنج قابلیت اقتباس‌شده از رقبا و مرزهای صادقانه‌ی هرکدام
 - [[concepts/production-workflow]] — حساب کارخانه، دیتابیس، ثبت بچ/CSV، داشبورد اپراتور و KPI وزن‌دار
 - [[concepts/data-moat]] — مزیت رقابتی از داده‌ی بومی «ترکیب ← پارامتر ← کیفیت»
 - [[concepts/business-model]] — مدل درآمدی SaaS + کمیسیون بازارگاه
