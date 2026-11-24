@@ -66,3 +66,23 @@ class Batch(Material):
 
 class Verification(Input):
     quality_verified: bool
+
+
+class Downtime(Input):
+    machine_id: Annotated[str, StringConstraints(min_length=1, max_length=36)]
+    started_on: date
+    minutes: Annotated[Finite, Field(gt=0, le=20160)]
+    kind: Literal["downtime", "maintenance", "quality_drift"] = "downtime"
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)] = ""
+
+    @model_validator(mode="after")
+    def not_in_future(self):
+        if self.started_on > date.today():
+            raise ValueError("Downtime date cannot be in the future")
+        return self
+
+
+class PolymerPrice(Input):
+    polymer: Polymer
+    price_per_kg: Annotated[Finite, Field(gt=0, le=1_000_000_000)]
+    currency: Literal["IRR", "USD", "EUR"] = "IRR"

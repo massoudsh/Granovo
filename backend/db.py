@@ -94,6 +94,40 @@ recommendations = Table("recommendations", metadata,
     Column("approved_at", Float),
 )
 
+downtime_events = Table("downtime_events", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("factory_id", ForeignKey("factories.id"), nullable=False, index=True),
+    Column("machine_id", ForeignKey("machines.id"), nullable=False, index=True),
+    Column("started_on", String(10), nullable=False, index=True),
+    Column("minutes", Float, nullable=False),
+    Column("kind", String(20), nullable=False),
+    Column("note", String(500), nullable=False, default=""),
+    Column("created_by", ForeignKey("users.id"), nullable=False),
+    Column("created_at", Float, nullable=False),
+    CheckConstraint("minutes > 0 AND minutes <= 20160"),
+    CheckConstraint("kind IN ('downtime', 'maintenance', 'quality_drift')"),
+)
+polymer_prices = Table("polymer_prices", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("factory_id", ForeignKey("factories.id"), nullable=False, index=True),
+    Column("polymer", String(10), nullable=False),
+    Column("price_per_kg", Float, nullable=False),
+    Column("currency", String(3), nullable=False, default="IRR"),
+    Column("updated_by", ForeignKey("users.id"), nullable=False),
+    Column("updated_at", Float, nullable=False),
+    UniqueConstraint("factory_id", "polymer"),
+    CheckConstraint("price_per_kg > 0"),
+)
+passports = Table("passports", metadata,
+    Column("token", String(64), primary_key=True),
+    Column("factory_id", ForeignKey("factories.id"), nullable=False, index=True),
+    Column("batch_id", ForeignKey("batches.id"), nullable=False, unique=True),
+    Column("content_hash", String(64), nullable=False),
+    Column("snapshot", JSON, nullable=False),
+    Column("issued_by", ForeignKey("users.id"), nullable=False),
+    Column("issued_at", Float, nullable=False),
+)
+
 
 def make_engine(url=None):
     data_dir = Path(os.environ.get("GRANOVO_DATA_DIR", Path(__file__).resolve().parents[1]))
